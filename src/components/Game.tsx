@@ -1,92 +1,49 @@
-import React, { useRef, useEffect } from 'react';
-import { useGameState } from '../hooks/useGamestate';
-import DialogueBox from './DialogueBox';
-import GameUI from './GameUI';
+// src/components/Game.tsx
+
+import React, { useEffect, useRef } from 'react';
 import { GameEngine } from '../engine/GameEngine';
 
 const Game: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameEngine = useRef<GameEngine | null>(null);
-  const { 
-    gameState, 
-    showDialogue, 
-    dialogueText, 
-    dialogueSpeaker,
-    advanceDialogue,
-    playerPosition,
-    updatePlayerPosition,
-    triggerDialogue,
-    changeRegion
-  } = useGameState();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<GameEngine>();
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-    
-    // Setup canvas size
+    if (!containerRef.current) return;
+
+    // Create the canvas and append it to our container
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    containerRef.current.appendChild(canvas);
+
+    // Instantiate and start the game engine
+    const engine = new GameEngine(canvas);
+    engineRef.current = engine;
+    engine.start();
+
+    // Resize handler to keep canvas filling its container
     const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      
-      if (gameEngine.current) {
-        gameEngine.current.resize(canvas.width, canvas.height);
-      }
+      const width = containerRef.current!.clientWidth;
+      const height = containerRef.current!.clientHeight;
+      engine.resize(width, height);
     };
-    
-    handleResize();
     window.addEventListener('resize', handleResize);
-    
-    // Initialize game engine with callbacks
-    gameEngine.current = new GameEngine(
-      canvas, 
-      gameState, 
-      updatePlayerPosition,
-      triggerDialogue,
-      changeRegion
-    );
-    gameEngine.current.start();
-    
+    handleResize();
+
+    // Cleanup on unmount
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (gameEngine.current) {
-        gameEngine.current.stop();
-      }
+      engine.stop();
+      containerRef.current?.removeChild(canvas);
     };
-  }, [gameState, updatePlayerPosition, triggerDialogue, changeRegion]);
-
-  // Handle canvas clicks for dialogue and interaction
-  const handleCanvasClick = () => {
-    if (showDialogue) {
-      advanceDialogue();
-    } else if (gameEngine.current) {
-      gameEngine.current.handleClick();
-    }
-  };
+  }, []);
 
   return (
-    <div className="relative w-full h-full bg-[#000080] overflow-hidden">
-      <canvas 
-        ref={canvasRef} 
-        className="absolute top-0 left-0 w-full h-full pixel-art"
-        onClick={handleCanvasClick}
-      />
-      
-      {showDialogue && (
-        <div className="absolute bottom-8 left-0 right-0 z-10">
-          <DialogueBox 
-            text={dialogueText} 
-            speaker={dialogueSpeaker} 
-            onAdvance={advanceDialogue} 
-          />
-        </div>
-      )}
-      
-      <GameUI gameState={gameState} playerPosition={playerPosition} />
-    </div>
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+    />
   );
 };
 

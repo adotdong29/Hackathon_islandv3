@@ -1,154 +1,130 @@
-import { GameState } from '../types/GameTypes';
+// src/engine/GameEngine.ts
+
 import { RenderSystem } from './RenderSystem';
-import { InputSystem } from './InputSystem';
-import { MapSystem } from './MapSystem';
-import { CharacterSystem } from './CharacterSystem';
-import { AnimationSystem } from './AnimationSystem';
-import { SpriteSystem } from './SpriteSystem';
-import { PathfindingSystem } from './PathfindingSystem';
-import { npcDialogues } from '../data/dialogues';
+import { MapSystem }    from './MapSystem';
+import { MapRegion }    from '../types/GameTypes';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private gameState: GameState;
-  private running: boolean = false;
-  private lastTime: number = 0;
-  private updatePlayerPositionCallback: (x: number, y: number) => void;
-  private triggerDialogueCallback: (dialogues: any[]) => void;
-  private changeRegionCallback: (regionName: string) => void;
-  
-  // Game systems
-  private renderSystem: RenderSystem;
-  private inputSystem: InputSystem;
-  private mapSystem: MapSystem;
-  private characterSystem: CharacterSystem;
-  private animationSystem: AnimationSystem;
-  private spriteSystem: SpriteSystem;
-  private pathfindingSystem: PathfindingSystem | null = null;
+  private ctx:    CanvasRenderingContext2D;
+  private rs:     RenderSystem;
+  private ms:     MapSystem;
 
-  constructor(
-    canvas: HTMLCanvasElement, 
-    gameState: GameState,
-    updatePlayerPosition: (x: number, y: number) => void,
-    triggerDialogue: (dialogues: any[]) => void,
-    changeRegion: (regionName: string) => void
-  ) {
+  private lastTime = 0;
+  private frameId: number | null = null;
+
+  public playerX: number;
+  public playerY: number;
+  private playerDir: 'up'|'down'|'left'|'right' = 'down';
+  private speed = 200; // px/sec
+  private keys: Record<string, boolean> = {};
+
+  private npcs: { x:number; y:number; color:string; name:string }[] = [];
+  private currentRegion: string | null = null;
+
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
-    this.gameState = gameState;
-    this.updatePlayerPositionCallback = updatePlayerPosition;
-    this.triggerDialogueCallback = triggerDialogue;
-    this.changeRegionCallback = changeRegion;
-    
-    // Initialize systems
-    this.renderSystem = new RenderSystem(this.ctx);
-    this.inputSystem = new InputSystem(this.canvas);
-    this.mapSystem = new MapSystem();
-    this.characterSystem = new CharacterSystem();
-    this.animationSystem = new AnimationSystem();
-    this.spriteSystem = new SpriteSystem();
+    this.ctx    = canvas.getContext('2d')!;
+    this.rs     = new RenderSystem(this.ctx);
+    this.ms     = new MapSystem();
 
-    // Initialize pathfinding after map is loaded
-    this.pathfindingSystem = new PathfindingSystem(this.mapSystem.getMap());
+    // Spawn player at map-center
+    // Map is cols×tileSize by rows×tileSize
+    this.playerX = (this.ms['cols'] * this.ms.tileSize) / 2;
+    this.playerY = (this.ms['rows'] * this.ms.tileSize) / 2;
+
+    // Build NPC list from the same regionDefs
+    (this.ms as any).regionDefs.forEach((r: any) => {
+      const x = r.xPct * this.ms['cols'] * this.ms.tileSize;
+      const y = r.yPct * this.ms['rows'] * this.ms.tileSize;
+      this.npcs.push({ x, y, color:'#FFF', name:r.name });
+    });
+
+    this.attachListeners();
   }
 
+  /** Kick off the loop */
   public start(): void {
-    if (this.running) return;
-    
-    this.running = true;
     this.lastTime = performance.now();
-    requestAnimationFrame(this.gameLoop);
-    
-    if (this.gameState.gamePhase === 'INTRO') {
-      this.startIntroAnimation();
-    }
+    this.frameId = requestAnimationFrame(this.loop.bind(this));
   }
 
+  /** Resize canvas & recenter */
+  public resize(w: number, h: number): void {
+    this.canvas.width  = w;
+    this.canvas.height = h;
+    this.playerX = (this.ms['cols'] * this.ms.tileSize) / 2;
+    this.playerY = (this.ms['rows'] * this.ms.tileSize) / 2;
+  }
+
+  /** Stop the loop */
   public stop(): void {
-    this.running = false;
+    if (this.frameId != null) cancelAnimationFrame(this.frameId);
+    this.frameId = null;
   }
 
-  public resize(width: number, height: number): void {
-    this.canvas.width = width;
-    this.canvas.height = height;
+  private attachListeners(): void {
+    window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup',   e => this.keys[e.key.toLowerCase()] = false);
   }
 
-  private gameLoop = (timestamp: number): void => {
-    if (!this.running) return;
-    
-    const deltaTime = timestamp - this.lastTime;
-    this.lastTime = timestamp;
-    
-    this.update(deltaTime);
+  private loop(now: number): void {
+    const dt = (now - this.lastTime) / 1000;
+    this.lastTime = now;
+
+    this.update(dt);
     this.render();
-    
-    requestAnimationFrame(this.gameLoop);
-  };
 
-  private update(deltaTime: number): void {
-    // Get movement from input system
-    const movement = this.inputSystem.update();
-    
-    // Update all game systems
-    this.mapSystem.update(deltaTime);
-    this.characterSystem.update(deltaTime, movement);
-    this.animationSystem.update(deltaTime);
-    this.spriteSystem.update(deltaTime);
-    
-    // Update camera and player position
-    const player = this.characterSystem.getPlayer();
-    if (player) {
-      this.mapSystem.setCameraTarget(player.x, player.y);
-      this.updatePlayerPositionCallback(player.x, player.y);
+    this.frameId = requestAnimationFrame(this.loop.bind(this));
+  }
+
+  private update(dt: number): void {
+    // Movement
+    let dx = 0, dy = 0;
+    if (this.keys['arrowleft'] || this.keys['a'])  { dx = -1; this.playerDir = 'left';  }
+    if (this.keys['arrowright']|| this.keys['d'])  { dx =  1; this.playerDir = 'right'; }
+    if (this.keys['arrowup']   || this.keys['w'])  { dy = -1; this.playerDir = 'up';    }
+    if (this.keys['arrowdown'] || this.keys['s'])  { dy =  1; this.playerDir = 'down';  }
+
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      dx /= len; dy /= len;
+      this.playerX += dx * this.speed * dt;
+      this.playerY += dy * this.speed * dt;
     }
-    
-    this.checkRegionChange();
+
+    // Region detection
+    const region: MapRegion | null = this.ms.getRegionAtPosition(this.playerX, this.playerY);
+    const name = region ? region.name : null;
+    if (name !== this.currentRegion) {
+      this.currentRegion = name;
+      console.log('Now in region:', name);
+      // TODO: trigger NPC dialogue / mini-game
+    }
   }
 
   private render(): void {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    this.renderSystem.begin();
-    this.renderSystem.renderBackground();
-    this.mapSystem.render(this.renderSystem);
-    this.characterSystem.render(this.renderSystem, this.spriteSystem);
-    this.renderSystem.end();
-  }
+    // 1) Clear & apply camera transform
+    this.rs.begin();
+    const tx = this.canvas.width  / 2 - this.playerX;
+    const ty = this.canvas.height / 2 - this.playerY;
+    this.ctx.translate(tx, ty);
 
-  public handleClick(): void {
-    const mousePos = this.inputSystem.getMousePosition();
-    if (!mousePos) return;
-    
-    const clickedNPC = this.characterSystem.checkNPCClick(mousePos.x, mousePos.y);
-    if (clickedNPC && clickedNPC.dialogues.length > 0) {
-      this.triggerDialogueCallback(clickedNPC.dialogues);
-      return;
-    }
-    
-    const clickedRegion = this.mapSystem.checkRegionClick(mousePos.x, mousePos.y);
-    if (clickedRegion) {
-      this.changeRegionCallback(clickedRegion.name);
-      const regionDialogues = npcDialogues[clickedRegion.id];
-      if (regionDialogues) {
-        this.triggerDialogueCallback(regionDialogues);
-      }
-    }
-  }
+    // 2) Draw the big island & decorations
+    this.ms.render(this.rs);
 
-  private checkRegionChange(): void {
-    const playerPos = this.characterSystem.getPlayerPosition();
-    if (!playerPos) return;
-    
-    const currentRegion = this.mapSystem.getRegionAtPosition(playerPos.x, playerPos.y);
-    if (currentRegion && currentRegion.name !== this.gameState.currentRegion) {
-      this.changeRegionCallback(currentRegion.name);
-    }
-  }
-
-  private startIntroAnimation(): void {
-    this.animationSystem.playIntroAnimation(() => {
-      // Animation complete callback
+    // 3) Draw NPCs
+    this.npcs.forEach(npc => {
+      this.rs.drawNPC(npc.x, npc.y, npc.color);
+      this.rs.drawText(npc.name, npc.x, npc.y - 20, '#FFF', 14, 'center');
     });
+
+    // 4) Draw player
+    const moving = Object.values(this.keys).some(k => k);
+    this.rs.drawCharacter(this.playerX, this.playerY, this.playerDir, moving);
+
+    // 5) Restore transform & finish
+    this.ctx.resetTransform();
+    this.rs.end();
   }
 }
