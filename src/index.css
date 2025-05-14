@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* '80s color palette */
+  --color-primary: #ff00ff; /* Magenta */
+  --color-secondary: #00ffff; /* Cyan */
+  --color-accent: #ffff00; /* Yellow */
+  --color-background: #000080; /* Navy Blue */
+  --color-text: #ffffff; /* White */
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Press Start 2P', cursive;
+  image-rendering: pixelated;
+  background-color: var(--color-background);
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.dialogue-box {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: 4px solid white;
+  padding: 1rem;
+  border-radius: 8px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 600px;
+  position: relative;
+  margin: 0 auto;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.blink {
+  animation: blink 1s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.float {
+  animation: float 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Grid pattern for backgrounds */
+.grid-bg {
+  background-image: linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Neon glow effects */
+.neon-text {
+  text-shadow: 0 0 5px var(--color-secondary),
+               0 0 10px var(--color-secondary),
+               0 0 15px var(--color-secondary);
+}
+
+.neon-border {
+  box-shadow: 0 0 5px var(--color-primary),
+              0 0 10px var(--color-primary),
+              0 0 15px var(--color-primary);
+}
+
+/* Region highlight effect */
+.region-highlight {
+  animation: region-pulse 2s infinite;
+}
+
+@keyframes region-pulse {
+  0%, 100% { box-shadow: 0 0 5px var(--color-accent); }
+  50% { box-shadow: 0 0 20px var(--color-accent); }
+}
+
+/* Retro button styles */
+.retro-button {
+  background-color: var(--color-primary);
+  color: var(--color-text);
+  border: 2px solid var(--color-text);
+  font-family: 'Press Start 2P', cursive;
+  padding: 8px 16px;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.retro-button:hover {
+  background-color: var(--color-text);
+  color: var(--color-primary);
+  transform: scale(1.05);
+  box-shadow: 0 0 10px var(--color-primary);
+}
+
+.retro-button:active {
+  transform: scale(0.95);
+}
