@@ -1,7 +1,7 @@
 // src/types/GameTypes.ts
 
 /**
- * The full set of tile types our engine can draw.
+ * All possible tile types on our procedural map.
  */
 export type TileType =
   | 'water'
@@ -12,7 +12,7 @@ export type TileType =
   | 'obstacle';
 
 /**
- * A single tile on the map.
+ * A single map tile.
  */
 export interface MapTile {
   type: TileType;
@@ -27,8 +27,8 @@ export interface MapRegion {
 }
 
 /**
- * The overall map definition when loading from data.
- * (Not used by the procedural MapSystem, but kept for compatibility.)
+ * The overall game map structure (not used by the procedural MapSystem,
+ * but useful if you ever load a static JSON map).
  */
 export interface GameMap {
   width: number;
@@ -36,4 +36,14 @@ export interface GameMap {
   tileSize: number;
   tiles: MapTile[][];
   regions: MapRegion[];
+}
+
+/**
+ * A line of dialogue for NPCs or guides.
+ */
+export interface Dialogue {
+  /** The text to display. */
+  text: string;
+  /** The speaker’s identifier (used for portraits or labels). */
+  speaker: string;
 }

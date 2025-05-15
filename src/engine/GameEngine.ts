@@ -16,11 +16,14 @@ export class GameEngine {
   public playerX: number;
   public playerY: number;
   private playerDir: 'up'|'down'|'left'|'right' = 'down';
-  private speed = 200; // px/sec
-  private keys: Record<string, boolean> = {};
+  private speed = 200;
+  private keys: Record<string,boolean> = {};
 
   private npcs: { x:number; y:number; color:string; name:string }[] = [];
-  private currentRegion: string | null = null;
+  private currentRegion: string|null = null;
+
+  /** Intro dialogue callback; set by Game.tsx */
+  public onIntroDone?: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -28,38 +31,46 @@ export class GameEngine {
     this.rs     = new RenderSystem(this.ctx);
     this.ms     = new MapSystem();
 
-    // Spawn player at map-center
-    // Map is cols×tileSize by rows×tileSize
-    this.playerX = (this.ms['cols'] * this.ms.tileSize) / 2;
-    this.playerY = (this.ms['rows'] * this.ms.tileSize) / 2;
+    // Spawn center
+    this.playerX = (this.ms['cols']*this.ms.tileSize)/2;
+    this.playerY = (this.ms['rows']*this.ms.tileSize)/2;
 
-    // Build NPC list from the same regionDefs
+    // NPCs at region endpoints
     (this.ms as any).regionDefs.forEach((r: any) => {
       const x = r.xPct * this.ms['cols'] * this.ms.tileSize;
       const y = r.yPct * this.ms['rows'] * this.ms.tileSize;
-      this.npcs.push({ x, y, color:'#FFF', name:r.name });
+      this.npcs.push({ x,y, color:'#FFF', name:r.name });
     });
 
     this.attachListeners();
   }
 
-  /** Kick off the loop */
   public start(): void {
+    // trigger intro if supplied
+    if (this.onIntroDone) {
+      this.onIntroDone(); // Game.tsx will handle pausing until dialogues done
+    } else {
+      this.lastTime = performance.now();
+      this.frameId = requestAnimationFrame(this.loop.bind(this));
+    }
+  }
+
+  /** called by Game.tsx after intro */
+  public resume(): void {
     this.lastTime = performance.now();
     this.frameId = requestAnimationFrame(this.loop.bind(this));
   }
 
-  /** Resize canvas & recenter */
-  public resize(w: number, h: number): void {
+  public resize(w:number,h:number): void {
     this.canvas.width  = w;
     this.canvas.height = h;
-    this.playerX = (this.ms['cols'] * this.ms.tileSize) / 2;
-    this.playerY = (this.ms['rows'] * this.ms.tileSize) / 2;
+    // re-center on resize
+    this.playerX = (this.ms['cols']*this.ms.tileSize)/2;
+    this.playerY = (this.ms['rows']*this.ms.tileSize)/2;
   }
 
-  /** Stop the loop */
   public stop(): void {
-    if (this.frameId != null) cancelAnimationFrame(this.frameId);
+    if (this.frameId!=null) cancelAnimationFrame(this.frameId);
     this.frameId = null;
   }
 
@@ -68,8 +79,8 @@ export class GameEngine {
     window.addEventListener('keyup',   e => this.keys[e.key.toLowerCase()] = false);
   }
 
-  private loop(now: number): void {
-    const dt = (now - this.lastTime) / 1000;
+  private loop(now:number): void {
+    const dt = (now - this.lastTime)/1000;
     this.lastTime = now;
 
     this.update(dt);
@@ -78,52 +89,53 @@ export class GameEngine {
     this.frameId = requestAnimationFrame(this.loop.bind(this));
   }
 
-  private update(dt: number): void {
-    // Movement
-    let dx = 0, dy = 0;
-    if (this.keys['arrowleft'] || this.keys['a'])  { dx = -1; this.playerDir = 'left';  }
-    if (this.keys['arrowright']|| this.keys['d'])  { dx =  1; this.playerDir = 'right'; }
-    if (this.keys['arrowup']   || this.keys['w'])  { dy = -1; this.playerDir = 'up';    }
-    if (this.keys['arrowdown'] || this.keys['s'])  { dy =  1; this.playerDir = 'down';  }
+  private update(dt:number): void {
+    // Movement (Arrow/WASD)
+    let dx=0, dy=0;
+    if (this.keys['arrowleft']||this.keys['a'])   { dx=-1; this.playerDir='left'; }
+    if (this.keys['arrowright']||this.keys['d'])  { dx=1;  this.playerDir='right';}
+    if (this.keys['arrowup']||this.keys['w'])     { dy=-1; this.playerDir='up';   }
+    if (this.keys['arrowdown']||this.keys['s'])   { dy=1;  this.playerDir='down'; }
 
-    const len = Math.hypot(dx, dy);
-    if (len > 0) {
-      dx /= len; dy /= len;
-      this.playerX += dx * this.speed * dt;
-      this.playerY += dy * this.speed * dt;
+    const len = Math.hypot(dx,dy);
+    if (len>0) {
+      dx/=len; dy/=len;
+      this.playerX += dx*this.speed*dt;
+      this.playerY += dy*this.speed*dt;
     }
 
     // Region detection
-    const region: MapRegion | null = this.ms.getRegionAtPosition(this.playerX, this.playerY);
-    const name = region ? region.name : null;
-    if (name !== this.currentRegion) {
+    const reg: MapRegion|null = this.ms.getRegionAtPosition(this.playerX,this.playerY);
+    const name = reg?reg.name:null;
+    if (name!==this.currentRegion) {
       this.currentRegion = name;
-      console.log('Now in region:', name);
-      // TODO: trigger NPC dialogue / mini-game
+      console.log('Entered region',name);
+      // TODO: trigger dialogue or mini-game
     }
   }
 
   private render(): void {
-    // 1) Clear & apply camera transform
     this.rs.begin();
-    const tx = this.canvas.width  / 2 - this.playerX;
-    const ty = this.canvas.height / 2 - this.playerY;
-    this.ctx.translate(tx, ty);
 
-    // 2) Draw the big island & decorations
+    // camera transform
+    const tx = this.canvas.width/2 - this.playerX;
+    const ty = this.canvas.height/2 - this.playerY;
+    this.ctx.translate(tx,ty);
+
+    // draw map
     this.ms.render(this.rs);
 
-    // 3) Draw NPCs
+    // draw NPCs
     this.npcs.forEach(npc => {
-      this.rs.drawNPC(npc.x, npc.y, npc.color);
-      this.rs.drawText(npc.name, npc.x, npc.y - 20, '#FFF', 14, 'center');
+      this.rs.drawNPC(npc.x,npc.y,npc.color);
+      this.rs.drawText(npc.name,npc.x,npc.y-20,'#FFF',14,'center');
     });
 
-    // 4) Draw player
-    const moving = Object.values(this.keys).some(k => k);
-    this.rs.drawCharacter(this.playerX, this.playerY, this.playerDir, moving);
+    // draw player
+    const moving = Object.values(this.keys).some(v=>v);
+    this.rs.drawCharacter(this.playerX,this.playerY,this.playerDir,moving);
 
-    // 5) Restore transform & finish
+    // restore
     this.ctx.resetTransform();
     this.rs.end();
   }
