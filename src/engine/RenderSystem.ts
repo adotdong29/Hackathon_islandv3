@@ -13,6 +13,13 @@ export class RenderSystem {
   public begin(): void { this.ctx.save(); }
   public end(): void   { this.ctx.restore(); }
 
+  public drawNPC(x: number, y: number, color: string): void {
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, 16, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
   public drawWaterBackground(x: number, y: number, w: number, h: number, time: number): void {
     const gradient = this.ctx.createLinearGradient(x, y, x + w, y + h);
     gradient.addColorStop(0, '#1E90FF');
