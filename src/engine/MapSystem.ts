@@ -16,15 +16,24 @@ type DecoType =
   | 'mountain'
   | 'bamboo'
   | 'palm'
-  | 'bird';
+  | 'bird'
+  | 'cherryBlossom'
+  | 'lantern'
+  | 'floatingIsland'
+  | 'banner'
+  | 'mascot'
+  | 'portal'
+  | 'crystals';
 
 interface Decoration {
   type: DecoType;
   x: number;
-  y: number;          // for bird this is base Y
-  size?: number;      // for tree/house/city/mountain/palm
-  height?: number;    // for bamboo
-  phase?: number;     // for bird flapping
+  y: number;          // for bird/lantern/mascot this is base Y
+  size?: number;      // for tree/house/city/mountain/palm/crystals
+  height?: number;    // for bamboo/banner
+  phase?: number;     // for animated elements
+  color?: string;     // for lanterns/banners
+  floatOffset?: number; // for floating elements
 }
 
 export class MapSystem {
@@ -44,13 +53,14 @@ export class MapSystem {
 
   private pathTiles = new Set<string>();
   private decorations: Decoration[] = [];
+  private neonColors = ['#FF00FF', '#00FFFF', '#FFFF00', '#FF1493', '#4169E1', '#32CD32'];
 
   constructor() {
     this.computePaths();
     this.scatterDecorations();
   }
 
-  /** Bresenham’s line for radial paths */
+  /** Bresenham's line for radial paths */
   private bresenham(x0:number,y0:number,x1:number,y1:number): [number,number][] {
     const pts: [number,number][] = [];
     let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
@@ -86,128 +96,206 @@ export class MapSystem {
     const midWorldY = (this.rows * this.tileSize) / 2;
     const mapRadiusPx = Math.min(this.cols, this.rows) * this.tileSize * 0.45;
 
-    // 1) Region‐specific clusters
+    // Add floating islands around the map edges
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const distance = mapRadiusPx * 0.9;
+      this.decorations.push({
+        type: 'floatingIsland',
+        x: midWorldX + Math.cos(angle) * distance,
+        y: midWorldY + Math.sin(angle) * distance,
+        size: 80 + Math.random() * 40,
+        floatOffset: Math.random() * Math.PI * 2
+      });
+    }
+
+    // Add portals at each region entrance
+    this.regionDefs.forEach(r => {
+      const x = r.xPct * this.cols * this.tileSize;
+      const y = r.yPct * this.rows * this.tileSize;
+      this.decorations.push({
+        type: 'portal',
+        x: x,
+        y: y - 40,
+        phase: Math.random() * Math.PI * 2
+      });
+    });
+
+    // Region-specific clusters with enhanced decorations
     this.regionDefs.forEach(r => {
       const cx = r.xPct * this.cols * this.tileSize;
       const cy = r.yPct * this.rows * this.tileSize;
       const radius = this.tileSize * 15;
 
+      // Add floating lanterns around each region
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const rd = radius * 0.8;
+        this.decorations.push({
+          type: 'lantern',
+          x: cx + Math.cos(angle) * rd,
+          y: cy + Math.sin(angle) * rd,
+          color: this.neonColors[Math.floor(Math.random() * this.neonColors.length)],
+          floatOffset: Math.random() * Math.PI * 2
+        });
+      }
+
+      // Add banners
+      for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2;
+        const rd = radius * 0.6;
+        this.decorations.push({
+          type: 'banner',
+          x: cx + Math.cos(angle) * rd,
+          y: cy + Math.sin(angle) * rd,
+          height: 60 + Math.random() * 20,
+          color: this.neonColors[Math.floor(Math.random() * this.neonColors.length)]
+        });
+      }
+
       switch (r.name) {
         case 'hardwareZone':
-          // City: many small houses + one big city block
+          // Cyber city with crystal formations
           for (let i = 0; i < 250; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
             this.decorations.push({
-              type: 'house',
+              type: 'crystals',
               x: cx + Math.cos(a)*rd,
               y: cy + Math.sin(a)*rd,
-              size: 16 + Math.random()*24
+              size: 16 + Math.random()*24,
+              color: this.neonColors[Math.floor(Math.random() * this.neonColors.length)]
             });
           }
-          this.decorations.push({
-            type: 'city',
-            x: cx, y: cy,
-            size: radius * 0.8
-          });
           break;
 
         case 'softwareValley':
-          // Lush forest
+          // Cherry blossom forest
           for (let i = 0; i < 400; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
             this.decorations.push({
-              type: 'microTree',
+              type: 'cherryBlossom',
               x: cx + Math.cos(a)*rd,
               y: cy + Math.sin(a)*rd,
-              size: 12 + Math.random()*16
+              size: 12 + Math.random()*16,
+              phase: Math.random() * Math.PI * 2
             });
           }
           break;
 
         case 'arcadeCove':
-          // Coastal village + birds overhead
-          for (let i = 0; i < 200; i++) {
+          // Animated mascots and neon signs
+          for (let i = 0; i < 20; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
             this.decorations.push({
-              type: 'house',
+              type: 'mascot',
               x: cx + Math.cos(a)*rd,
               y: cy + Math.sin(a)*rd,
-              size: 16 + Math.random()*16
-            });
-          }
-          for (let i = 0; i < 40; i++) {
-            this.decorations.push({
-              type: 'bird',
-              x: cx - radius + Math.random()*radius*2,
-              y: cy - radius*0.5 + Math.random()*radius*0.5,
-              phase: Math.random()*Math.PI*2
+              phase: Math.random() * Math.PI * 2
             });
           }
           break;
 
         case 'consoleIsland':
-          // Mountain peaks
+          // Crystal mountains and floating platforms
           for (let i = 0; i < 300; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
-            this.decorations.push({
-              type: 'mountain',
-              x: cx + Math.cos(a)*rd,
-              y: cy + Math.sin(a)*rd,
-              size: 20 + Math.random()*60
-            });
+            if (Math.random() < 0.7) {
+              this.decorations.push({
+                type: 'mountain',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                size: 20 + Math.random()*60
+              });
+            } else {
+              this.decorations.push({
+                type: 'floatingIsland',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                size: 40 + Math.random()*20,
+                floatOffset: Math.random() * Math.PI * 2
+              });
+            }
           }
           break;
 
         case 'mobileBay':
-          // Palm beaches
+          // Magical palm trees and lanterns
           for (let i = 0; i < 350; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
-            this.decorations.push({
-              type: 'palm',
-              x: cx + Math.cos(a)*rd,
-              y: cy + Math.sin(a)*rd,
-              size: 16 + Math.random()*16
-            });
+            if (Math.random() < 0.7) {
+              this.decorations.push({
+                type: 'palm',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                size: 16 + Math.random()*16
+              });
+            } else {
+              this.decorations.push({
+                type: 'lantern',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                color: this.neonColors[Math.floor(Math.random() * this.neonColors.length)],
+                floatOffset: Math.random() * Math.PI * 2
+              });
+            }
           }
           break;
 
         case 'internetPoint':
-          // Bamboo grove
+          // Digital bamboo grove with floating data streams
           for (let i = 0; i < 450; i++) {
             const a = Math.random()*2*Math.PI;
             const rd = Math.sqrt(Math.random()) * radius;
-            this.decorations.push({
-              type: 'bamboo',
-              x: cx + Math.cos(a)*rd,
-              y: cy + Math.sin(a)*rd,
-              height: 20 + Math.random()*80
-            });
+            if (Math.random() < 0.7) {
+              this.decorations.push({
+                type: 'bamboo',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                height: 20 + Math.random()*80
+              });
+            } else {
+              this.decorations.push({
+                type: 'crystals',
+                x: cx + Math.cos(a)*rd,
+                y: cy + Math.sin(a)*rd,
+                size: 12 + Math.random()*16,
+                color: '#00FFFF'
+              });
+            }
           }
           break;
       }
     });
 
-    // 2) Micro‐trees ALL OVER the island so the center is never empty
-    for (let i = 0; i < 3000; i++) {
+    // Scatter cherry blossoms and magical elements across the island
+    for (let i = 0; i < 2000; i++) {
       const angle = Math.random()*2*Math.PI;
-      const d = Math.sqrt(Math.random()) * mapRadiusPx;
-      this.decorations.push({
-        type: 'microTree',
-        x: midWorldX + Math.cos(angle)*d,
-        y: midWorldY + Math.sin(angle)*d,
-        size: 4 + Math.random()*8
-      });
+      const d = Math.sqrt(Math.random()) * mapRadiusPx * 0.8;
+      if (Math.random() < 0.7) {
+        this.decorations.push({
+          type: 'cherryBlossom',
+          x: midWorldX + Math.cos(angle)*d,
+          y: midWorldY + Math.sin(angle)*d,
+          size: 4 + Math.random()*8,
+          phase: Math.random() * Math.PI * 2
+        });
+      } else {
+        this.decorations.push({
+          type: 'crystals',
+          x: midWorldX + Math.cos(angle)*d,
+          y: midWorldY + Math.sin(angle)*d,
+          size: 4 + Math.random()*8,
+          color: this.neonColors[Math.floor(Math.random() * this.neonColors.length)]
+        });
+      }
     }
   }
 
-  /**
-   * Render only the visible slice of the map + decorations.
-   */
   public render(
     rs: RenderSystem,
     camX: number, camY: number,
@@ -216,10 +304,11 @@ export class MapSystem {
     const totalW = this.cols * this.tileSize;
     const totalH = this.rows * this.tileSize;
 
-    // 1) Water base
-    rs.drawRect(0,0,totalW,totalH,'#1E90FF');
+    // 1) Water base with animated gradient
+    const time = Date.now() / 1000;
+    rs.drawWaterBackground(0, 0, totalW, totalH, time);
 
-    // 2) Cull & draw ground tiles
+    // 2) Ground tiles with enhanced effects
     const startC = Math.max(0, Math.floor(camX/this.tileSize) - 1);
     const endC   = Math.min(this.cols, Math.ceil((camX+viewW)/this.tileSize) + 1);
     const startR = Math.max(0, Math.floor(camY/this.tileSize) - 1);
@@ -238,54 +327,78 @@ export class MapSystem {
           else if (d > rad - 2)                type='sand';
           else                                 type='grass';
         }
-        rs.drawTile(c*this.tileSize, r*this.tileSize, this.tileSize, type);
+        rs.drawEnhancedTile(c*this.tileSize, r*this.tileSize, this.tileSize, type, time);
       }
     }
 
-    // 3) Cull & draw decorations
+    // 3) Render decorations with animations
     const M = 64;
     const inView = (x:number,y:number) =>
       x >= camX - M && x <= camX + viewW + M
       && y >= camY - M && y <= camY + viewH + M;
 
-    for (const d of this.decorations) {
-      if (!inView(d.x,d.y)) continue;
+    // Sort decorations by y-coordinate for proper layering
+    const visibleDecorations = this.decorations
+      .filter(d => inView(d.x, d.y))
+      .sort((a, b) => a.y - b.y);
+
+    for (const d of visibleDecorations) {
+      const floatY = d.floatOffset ? 
+        Math.sin(time + d.floatOffset) * 10 : 0;
+
       switch (d.type) {
+        case 'cherryBlossom':
+          rs.drawCherryBlossom(d.x, d.y + floatY, d.size!, time + (d.phase || 0));
+          break;
+        case 'lantern':
+          rs.drawLantern(d.x, d.y + floatY, d.color!, time);
+          break;
+        case 'floatingIsland':
+          rs.drawFloatingIsland(d.x, d.y + floatY, d.size!, time);
+          break;
+        case 'banner':
+          rs.drawBanner(d.x, d.y, d.height!, d.color!, time);
+          break;
+        case 'mascot':
+          rs.drawMascot(d.x, d.y + floatY, time + (d.phase || 0));
+          break;
+        case 'portal':
+          rs.drawPortal(d.x, d.y + floatY, time + (d.phase || 0));
+          break;
+        case 'crystals':
+          rs.drawCrystals(d.x, d.y, d.size!, d.color!, time);
+          break;
         case 'microTree':
-          rs.drawTree(d.x,d.y,d.size!);
+          rs.drawEnhancedTree(d.x, d.y, d.size!, time);
           break;
         case 'house':
-          rs.drawHouse(d.x,d.y,d.size!);
-          break;
-        case 'city':
-          rs.drawHouse(d.x,d.y,d.size!);
+          rs.drawEnhancedHouse(d.x, d.y, d.size!, time);
           break;
         case 'mountain':
-          rs.drawMountain(d.x,d.y,d.size!);
+          rs.drawEnhancedMountain(d.x, d.y, d.size!, time);
           break;
         case 'bamboo':
-          rs.drawBamboo(d.x,d.y,d.height!);
+          rs.drawEnhancedBamboo(d.x, d.y, d.height!, time);
           break;
         case 'palm':
-          rs.drawPalm(d.x,d.y,d.size!);
+          rs.drawEnhancedPalm(d.x, d.y, d.size!, time);
           break;
         case 'bird':
-          const yoff = 10 * Math.sin(Date.now()/1000 + d.phase!);
-          rs.drawBird(d.x, d.y + yoff, 16);
+          const yoff = 10 * Math.sin(time + (d.phase || 0));
+          rs.drawEnhancedBird(d.x, d.y + yoff, 16, time);
           break;
       }
     }
 
-    // 4) Region labels
+    // 4) Region labels with enhanced styling
     for (const r of this.regionDefs) {
       const rx = r.xPct * totalW, ry = r.yPct * totalH;
       if (inView(rx, ry)) {
-        rs.drawText(r.name, rx, ry + 20, '#FFF', 14, 'center');
+        rs.drawEnhancedText(r.name, rx, ry + 20, time);
       }
     }
   }
 
-  /** Which region contains this world point? */
   public getRegionAtPosition(x:number,y:number): MapRegion|null {
     const c = Math.floor(x/this.tileSize),
           r = Math.floor(y/this.tileSize);
