@@ -156,23 +156,35 @@ export class SpriteSystem {
     }
   }
 
-  public updateSpriteDirection(id: string, dx: number, dy: number): void {
+  public updateSpriteDirectionAndAnimation(
+    id: string, 
+    normalizedDx: number, // Expect normalized input
+    normalizedDy: number, // Expect normalized input
+    explicitDirection: 'up'|'down'|'left'|'right', // from CharacterSystem
+    isMoving: boolean      // from CharacterSystem
+  ): void {
     const sprite = this.sprites.get(id);
     if (!sprite) return;
 
-    // Determine direction based on movement
-    if (Math.abs(dx) > Math.abs(dy)) {
-      sprite.direction = dx > 0 ? 'right' : 'left';
-      sprite.flipped = dx < 0;
-    } else if (dy !== 0) {
-      sprite.direction = dy > 0 ? 'down' : 'up';
+    sprite.direction = explicitDirection;
+
+    // Flipping logic for left/right
+    if (sprite.direction === 'left') {
+      sprite.flipped = true;
+    } else if (sprite.direction === 'right') {
       sprite.flipped = false;
+    } else {
+      sprite.flipped = false; // No flipping for up/down
     }
 
     // Set animation based on movement
-    sprite.currentAnimation = (dx !== 0 || dy !== 0) ? 'walk' : 'idle';
+    const targetAnimation = isMoving ? 'walk' : 'idle';
+    if (sprite.animations[targetAnimation]) {
+      sprite.currentAnimation = targetAnimation;
+    } else if (sprite.animations['idle']) { // Fallback to idle if 'walk' doesn't exist
+      sprite.currentAnimation = 'idle';
+    }
   }
-
   public setAnimation(id: string, animation: string): void {
     const sprite = this.sprites.get(id);
     if (sprite && sprite.animations[animation]) {
@@ -199,12 +211,12 @@ export class SpriteSystem {
     });
   }
 
-  public renderSprite(renderSystem: RenderSystem, id: string, spriteKey: string): void {
+  public renderSprite(renderSystem: RenderSystem, id: string, spriteKey: string, viewportX: number, viewportY: number): void {
     const sprite = this.sprites.get(id);
     if (!sprite) return;
-
     const animation = sprite.animations[sprite.currentAnimation];
     if (!animation) return;
+
 
     const frameX = animation.currentFrame * animation.frameWidth;
     let frameY = 0;
@@ -215,8 +227,10 @@ export class SpriteSystem {
         frameY = sprite.baseFrameY + 0; // Offset from the character's base Y
         break;
       case 'left':
-      case 'right':
         frameY = sprite.baseFrameY + animation.frameHeight; // Second row for this character
+        break;
+      case 'right':
+        frameY = sprite.baseFrameY + animation.frameHeight; // Same row as left, but sprite.flipped handles visual
         break;
       case 'up':
         frameY = sprite.baseFrameY + (animation.frameHeight * 2); // Third row for this character
@@ -225,8 +239,8 @@ export class SpriteSystem {
 
     renderSystem.drawSprite(
       spriteKey,
-      sprite.x - sprite.width / 2,
-      sprite.y - sprite.height / 2,
+      sprite.x - sprite.width / 2 - viewportX, // Adjust for viewport
+      sprite.y - sprite.height / 2 - viewportY, // Adjust for viewport
       sprite.width,
       sprite.height,
       frameX,

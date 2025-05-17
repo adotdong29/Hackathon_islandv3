@@ -47,3 +47,15 @@ export interface Dialogue {
   /** The speaker’s identifier (used for portraits or labels). */
   speaker: string;
 }
+
+/**
+ * Represents a character in the game (player or NPC).
+ */
+export interface Character {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  spriteSheet: string; // Reference to the sprite sheet asset key
+  dialogues: Dialogue[];
+}

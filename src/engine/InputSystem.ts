@@ -37,31 +37,41 @@ export class InputSystem {
       this.canvas.removeEventListener('touchmove', this.handleTouchMove);
     }
   
-    public update(): void {
-      // Handle keyboard movement
-      const speed = 5;
-      const movement = { x: 0, y: 0 };
-
+    // Renamed from update and modified to return normalized direction
+    public getMovementInput(): { dx: number, dy: number } {
+      let dx = 0;
+      let dy = 0;
+  
       if (this.isKeyDown('ArrowUp') || this.isKeyDown('w')) {
-        movement.y -= speed;
+        dy -= 1;
       }
       if (this.isKeyDown('ArrowDown') || this.isKeyDown('s')) {
-        movement.y += speed;
+        dy += 1;
       }
       if (this.isKeyDown('ArrowLeft') || this.isKeyDown('a')) {
-        movement.x -= speed;
+        dx -= 1;
       }
       if (this.isKeyDown('ArrowRight') || this.isKeyDown('d')) {
-        movement.x += speed;
+        dx += 1;
       }
-
-      return movement;
+  
+      // Normalize if diagonal movement
+      if (dx !== 0 && dy !== 0) {
+        const length = Math.sqrt(dx * dx + dy * dy);
+        dx /= length;
+        dy /= length;
+      }
+      return { dx, dy };
     }
   
     public isKeyDown(key: string): boolean {
       return this.keys.get(key) || false;
     }
   
+    public isShiftDown(): boolean {
+      return this.isKeyDown('Shift');
+    }
+
     public getMousePosition(): { x: number, y: number } | null {
       return { x: this.mouseX, y: this.mouseY };
     }

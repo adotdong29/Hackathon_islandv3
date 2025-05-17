@@ -1,164 +1,132 @@
-// src/engine/GameEngine.ts
-
 import { RenderSystem } from './RenderSystem';
 import { MapSystem }    from './MapSystem';
-import { MapRegion }    from '../types/GameTypes';
+import { IMinigame }    from '../minigames/IMinigame';
+import { MinigameLoader } from '../minigames/Minigameloader';
+import { HardwareAssemblyGame } from '../minigames/HardwareAssemblyGame';
+import { InputSystem } from './InputSystem';
+import { CharacterSystem } from './CharacterSystem';
+import { SpriteSystem } from './SpriteSystem'; // If using sprite animations
+// import other games similarly...
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
-  private ctx:    CanvasRenderingContext2D;
-  private rs:     RenderSystem;
-  private ms:     MapSystem;
-
+  private rs: RenderSystem;
+  private mapSys: MapSystem;
+  private loader: MinigameLoader;
+  private inputSystem: InputSystem;
+  private characterSystem: CharacterSystem;
+  private spriteSystem: SpriteSystem; // For sprite animations
   private lastTime = 0;
-  private frameId: number | null = null;
+  private running = false;
 
-  public playerX: number;
-  public playerY: number;
-  private dir: 'up'|'down'|'left'|'right' = 'down';
-  private speed = 400;
-  private keys: Record<string,boolean> = {};
-
-  private npcs: { x:number; y:number; color:string; name:string }[] = [];
-  private currentRegion: string | null = null;
+  // map region → minigame constructor
+  private regionGames: Record<string, () => IMinigame> = {
+    hardwareZone:   () => new HardwareAssemblyGame(),
+    // softwareValley: () => new SoftwareMazeGame(),
+    // arcadeCove:     () => new ArcadeHistoryGame(),
+    // consoleIsland:  () => new TVAssemblyGame(),
+    // mobileBay:      () => new MobileT9Game(),
+    // internetPoint:  () => new InternetTroubleshootGame(),
+  };
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx    = canvas.getContext('2d')!;
-    this.rs     = new RenderSystem(this.ctx);
-    this.ms     = new MapSystem();
+    this.rs     = new RenderSystem(canvas.getContext('2d')!);
+    this.mapSys = new MapSystem();
+    this.loader = new MinigameLoader(canvas);
+    this.inputSystem = new InputSystem(canvas);
+    this.characterSystem = new CharacterSystem();
+    this.spriteSystem = new SpriteSystem(); // Initialize SpriteSystem
 
-    // spawn in center
-    this.playerX = (this.ms.cols*this.ms.tileSize)/2;
-    this.playerY = (this.ms.rows*this.ms.tileSize)/2;
-
-    // Bill Gates at spawn
-    this.npcs.push({
-      x: this.playerX,
-      y: this.playerY,
-      color:'#FFD700',
-      name:'Bill Gates'
-    });
-
-    // add region NPCs
-    this.ms.regionDefs.forEach(r => {
-      const x = r.xPct * this.ms.cols * this.ms.tileSize;
-      const y = r.yPct * this.ms.rows * this.ms.tileSize;
-      this.npcs.push({ x,y, color:'#FFF', name:r.name });
-    });
-
-    this.attachListeners();
-  }
-
-  public start() {
-    this.lastTime = performance.now();
-    this.frameId = requestAnimationFrame(this.loop.bind(this));
-  }
-
-  public resize(w:number,h:number) {
-    this.canvas.width = w; this.canvas.height = h;
-  }
-
-  public stop() {
-    if(this.frameId) cancelAnimationFrame(this.frameId);
-    this.frameId = null;
-  }
-
-  private attachListeners() {
-    window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()]=true);
-    window.addEventListener('keyup',   e => this.keys[e.key.toLowerCase()]=false);
-  }
-
-  private loop(now:number) {
-    const dt = (now - this.lastTime)/1000;
-    this.lastTime = now;
-    this.update(dt);
-    this.render();
-    this.frameId = requestAnimationFrame(this.loop.bind(this));
-  }
-
-  private update(dt:number) {
-    let dx=0, dy=0;
-    if(this.keys['a']||this.keys['arrowleft'])  { dx=-1; this.dir='left'; }
-    if(this.keys['d']||this.keys['arrowright']) { dx= 1; this.dir='right';}
-    if(this.keys['w']||this.keys['arrowup'])    { dy=-1; this.dir='up';   }
-    if(this.keys['s']||this.keys['arrowdown'])  { dy= 1; this.dir='down'; }
-
-    const len = Math.hypot(dx,dy);
-    if(len>0){
-      dx/=len; dy/=len;
-      let sp = this.speed * (this.keys['shift']?2:1);
-      this.playerX += dx*sp*dt;
-      this.playerY += dy*sp*dt;
+    // Set player's initial position to map center
+    const player = this.characterSystem.getPlayer();
+    if (player) {
+      const cx = (this.mapSys.cols * this.mapSys.tileSize) / 2;
+      const cy = (this.mapSys.rows * this.mapSys.tileSize) / 2;
+      player.x = cx;
+      player.y = cy;
     }
 
-    // region change
-    const reg = this.ms.getRegionAtPosition(this.playerX, this.playerY);
-    const name = reg?reg.name:null;
-    if(name !== this.currentRegion){
-      this.currentRegion = name;
-      console.log('Entered:',name);
-    }
-  }
-
-  private render() {
-    // world render
-    const vw = this.canvas.width, vh = this.canvas.height;
-    const camX = this.playerX - vw/2, camY = this.playerY - vh/2;
-
-    this.rs.begin();
-    this.ctx.translate(-camX, -camY);
-    this.ms.render(this.rs, camX, camY, vw, vh);
-
-    // NPCs
-    for(const npc of this.npcs){
-      if(Math.abs(npc.x - this.playerX) < this.ms.cols*this.ms.tileSize &&
-         Math.abs(npc.y - this.playerY) < this.ms.rows*this.ms.tileSize){
-        this.rs.drawNPC(npc.x, npc.y, npc.color);
-        this.rs.drawText(npc.name, npc.x, npc.y-20, '#FFF',14,'center');
+    // space to start minigame
+    window.addEventListener('keydown', e => {
+      if (e.key === ' ') {
+        const playerPos = this.characterSystem.getPlayerPosition();
+        if (playerPos) {
+          const region = this.mapSys.getRegionAtPosition(playerPos.x, playerPos.y);
+          if (region && this.regionGames[region.name]) {
+            this.loader.load(this.regionGames[region.name]());
+          }
+        }
       }
+    });
+  }
+
+  /** Start the main loop */
+  public start(): void {
+    this.running = true;
+    this.lastTime = performance.now();
+    requestAnimationFrame(ts => this.loop(ts));
+  }
+
+  /** Stop the loop */
+  public stop(): void {
+    this.running = false;
+  }
+
+  /** Resize canvas */
+  public resize(width: number, height: number): void {
+    this.canvas.width  = width;
+    this.canvas.height = height;
+  }
+
+  private loop(timestamp: number): void {
+    if (!this.running) return;
+    const dt = timestamp - this.lastTime;
+    this.lastTime = timestamp;
+
+    if (!this.loader['current']) {
+      this.update(dt);
+      this.render();
     }
 
-    // player
-    const moving = Object.values(this.keys).some(v=>v);
-    this.rs.drawCharacter(this.playerX, this.playerY, this.dir, moving);
+    requestAnimationFrame(ts => this.loop(ts));
+  }
 
-    this.ctx.resetTransform();
+  private update(dt: number): void {
+    // Get normalized movement input
+    const { dx: normalizedDx, dy: normalizedDy } = this.inputSystem.getMovementInput();
+    const isSprinting = this.inputSystem.isShiftDown();
+
+    // Update player movement and state via CharacterSystem
+    this.characterSystem.updatePlayerMovement(dt, normalizedDx, normalizedDy, isSprinting, this.mapSys, this.spriteSystem);
+    
+    // Update camera to follow player
+    const playerPos = this.characterSystem.getPlayerPosition();
+    if (playerPos) {
+      this.mapSys.setCameraTarget(playerPos.x, playerPos.y);
+    }
+    this.mapSys.update();
+    
+    this.spriteSystem.update(dt); // Update sprite animations
+  }
+
+  private render(): void {
+    const w = this.canvas.width, h = this.canvas.height;
+    this.rs.begin();
+    this.mapSys.render(
+      this.rs,
+      this.mapSys.viewportX,
+      this.mapSys.viewportY,
+      w, h
+    );
+    // Render player and NPCs via CharacterSystem
+    this.characterSystem.render(this.rs, this.spriteSystem, this.mapSys.viewportX, this.mapSys.viewportY);
+    
+    // UI prompt
+    this.rs.drawText(
+      'Press [Space] near NPC to start',
+      w/2, h - 20, '#FFF', 14, 'center'
+    );
     this.rs.end();
-
-    // mini-map
-    const mmSize = 150, mmX = 10, mmY = 10;
-    const mapW = this.ms.cols*this.ms.tileSize,
-          mapH = this.ms.rows*this.ms.tileSize,
-          scale = mmSize/Math.max(mapW,mapH);
-
-    // background
-    this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    this.ctx.fillRect(mmX,mmY,mmSize,mmSize);
-
-    // viewport rectangle
-    this.ctx.strokeStyle = '#fff'; this.ctx.lineWidth=2;
-    this.ctx.strokeRect(
-      mmX + camX*scale,
-      mmY + camY*scale,
-      vw*scale,
-      vh*scale
-    );
-
-    // player dot
-    this.ctx.fillStyle = '#f00';
-    this.ctx.fillRect(
-      mmX + this.playerX*scale - 3,
-      mmY + this.playerY*scale - 3,
-      6,6
-    );
-
-    // region endpoints
-    this.ctx.fillStyle = '#ff0';
-    for(const r of this.ms.regionDefs){
-      const ex = r.xPct * mapW,
-            ey = r.yPct * mapH;
-      this.ctx.fillRect(mmX + ex*scale - 4, mmY + ey*scale - 4, 8,8);
-    }
   }
 }
