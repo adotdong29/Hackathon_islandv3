@@ -1,25 +1,45 @@
-import { RenderSystem } from './RenderSystem';
-import { MapSystem }    from './MapSystem';
-import { IMinigame }    from '../minigames/IMinigame';
-import { MinigameLoader } from '../minigames/Minigameloader';
+// src/engine/GameEngine.ts
+
+import { RenderSystem }        from './RenderSystem';
+import { MapSystem }           from './MapSystem';
+import { IMinigame }           from '../minigames/IMinigame';
+import { MinigameLoader }      from '../minigames/MinigameLoader';
 import { HardwareAssemblyGame } from '../minigames/HardwareAssemblyGame';
-import { InputSystem } from './InputSystem';
-import { CharacterSystem } from './CharacterSystem';
-import { SpriteSystem } from './SpriteSystem'; // If using sprite animations
-// import other games similarly...
+import { SoftwareMazeGame }    from '../minigames/SoftwareMazeGame';
+import { ArcadeHistoryGame }   from '../minigames/ArcadeHistory';
+import { TVAssemblyGame }      from '../minigames/TVAssemblyGame';
+import { MobileT9Game }        from '../minigames/MobileT9Game';
+import { InternetTroubleshootGame } from '../minigames/InternetTroubleshootGame';
+
+interface Player {
+  x: number;
+  y: number;
+  dir: 'up' | 'down' | 'left' | 'right';
+  moving: boolean;
+  baseSpeed: number; // pixels per second
+}
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
   private rs: RenderSystem;
   private mapSys: MapSystem;
   private loader: MinigameLoader;
-  private inputSystem: InputSystem;
-  private characterSystem: CharacterSystem;
-  private spriteSystem: SpriteSystem; // For sprite animations
+
   private lastTime = 0;
   private running = false;
 
-  // map region → minigame constructor
+  private player: Player = {
+    x: 0,
+    y: 0,
+    dir: 'down',
+    moving: false,
+    baseSpeed: 120,
+  };
+
+  /** Currently pressed keys (lowercased) */
+  private keys = new Set<string>();
+
+  /** Map each region name to its minigame constructor */
   private regionGames: Record<string, () => IMinigame> = {
     hardwareZone:   () => new HardwareAssemblyGame(),
     // softwareValley: () => new SoftwareMazeGame(),
@@ -34,56 +54,43 @@ export class GameEngine {
     this.rs     = new RenderSystem(canvas.getContext('2d')!);
     this.mapSys = new MapSystem();
     this.loader = new MinigameLoader(canvas);
-    this.inputSystem = new InputSystem(canvas);
-    this.characterSystem = new CharacterSystem();
-    this.spriteSystem = new SpriteSystem(); // Initialize SpriteSystem
 
-    // Set player's initial position to map center
-    const player = this.characterSystem.getPlayer();
-    if (player) {
-      const cx = (this.mapSys.cols * this.mapSys.tileSize) / 2;
-      const cy = (this.mapSys.rows * this.mapSys.tileSize) / 2;
-      player.x = cx;
-      player.y = cy;
-    }
+    // Place player at island center
+    const cx = (this.mapSys.cols * this.mapSys.tileSize) / 2;
+    const cy = (this.mapSys.rows * this.mapSys.tileSize) / 2;
+    this.player.x = cx;
+    this.player.y = cy;
 
-    // space to start minigame
-    window.addEventListener('keydown', e => {
-      if (e.key === ' ') {
-        const playerPos = this.characterSystem.getPlayerPosition();
-        if (playerPos) {
-          const region = this.mapSys.getRegionAtPosition(playerPos.x, playerPos.y);
-          if (region && this.regionGames[region.name]) {
-            this.loader.load(this.regionGames[region.name]());
-          }
-        }
-      }
-    });
+    // Key listeners
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup',   this.handleKeyUp);
   }
 
-  /** Start the main loop */
+  /** Start the game loop */
   public start(): void {
     this.running = true;
     this.lastTime = performance.now();
     requestAnimationFrame(ts => this.loop(ts));
   }
 
-  /** Stop the loop */
+  /** Stop the game loop */
   public stop(): void {
     this.running = false;
   }
 
-  /** Resize canvas */
+  /** Resize the canvas on window change */
   public resize(width: number, height: number): void {
     this.canvas.width  = width;
     this.canvas.height = height;
   }
 
+  /** Main loop */
   private loop(timestamp: number): void {
     if (!this.running) return;
     const dt = timestamp - this.lastTime;
     this.lastTime = timestamp;
 
+    // If no minigame active, update and render world
     if (!this.loader['current']) {
       this.update(dt);
       this.render();
@@ -92,41 +99,106 @@ export class GameEngine {
     requestAnimationFrame(ts => this.loop(ts));
   }
 
+  /** Update world state */
   private update(dt: number): void {
-    // Get normalized movement input
-    const { dx: normalizedDx, dy: normalizedDy } = this.inputSystem.getMovementInput();
-    const isSprinting = this.inputSystem.isShiftDown();
+    let dx = 0, dy = 0;
+    const k = this.keys;
 
-    // Update player movement and state via CharacterSystem
-    this.characterSystem.updatePlayerMovement(dt, normalizedDx, normalizedDy, isSprinting, this.mapSys, this.spriteSystem);
-    
-    // Update camera to follow player
-    const playerPos = this.characterSystem.getPlayerPosition();
-    if (playerPos) {
-      this.mapSys.setCameraTarget(playerPos.x, playerPos.y);
+    // Movement input
+    if (k.has('arrowup')    || k.has('w')) { dy -= 1; this.player.dir = 'up'; }
+    if (k.has('arrowdown')  || k.has('s')) { dy += 1; this.player.dir = 'down'; }
+    if (k.has('arrowleft')  || k.has('a')) { dx -= 1; this.player.dir = 'left'; }
+    if (k.has('arrowright') || k.has('d')) { dx += 1; this.player.dir = 'right'; }
+
+    if (dx !== 0 || dy !== 0) {
+      // Normalize diagonal
+      const len = Math.hypot(dx, dy);
+      dx /= len;
+      dy /= len;
+
+      // Sprint if Shift is held
+      const sprint = k.has('shift');
+      const speed  = this.player.baseSpeed * (sprint ? 1.5 : 1);
+      const dist   = speed * (dt / 1000);
+
+      const nx = this.player.x + dx * dist;
+      const ny = this.player.y + dy * dist;
+
+      // Collision: prevent walking on water
+      if (this.mapSys.isWalkable(nx, ny)) {
+        this.player.x = nx;
+        this.player.y = ny;
+      }
+
+      this.player.moving = true;
+    } else {
+      this.player.moving = false;
     }
+
+    // Update camera to follow player
+    this.mapSys.setCameraTarget(this.player.x, this.player.y);
     this.mapSys.update();
-    
-    this.spriteSystem.update(dt); // Update sprite animations
   }
 
+  /** Render world */
   private render(): void {
-    const w = this.canvas.width, h = this.canvas.height;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
     this.rs.begin();
+
+    // Draw map & decorations
     this.mapSys.render(
       this.rs,
       this.mapSys.viewportX,
       this.mapSys.viewportY,
       w, h
     );
-    // Render player and NPCs via CharacterSystem
-    this.characterSystem.render(this.rs, this.spriteSystem, this.mapSys.viewportX, this.mapSys.viewportY);
-    
-    // UI prompt
+
+    // Draw NPCs at each region center
+    for (const rd of this.mapSys.regionDefs) {
+      const wx = rd.xPct * this.mapSys.cols * this.mapSys.tileSize;
+      const wy = rd.yPct * this.mapSys.rows * this.mapSys.tileSize;
+      const sx = wx - this.mapSys.viewportX;
+      const sy = wy - this.mapSys.viewportY;
+      this.rs.drawNPC(sx, sy, '#FF4081');
+    }
+
+    // Draw player character
+    const px = this.player.x - this.mapSys.viewportX;
+    const py = this.player.y - this.mapSys.viewportY;
+    this.rs.drawCharacter(px, py, this.player.dir, this.player.moving);
+
+    // UI hint
     this.rs.drawText(
-      'Press [Space] near NPC to start',
-      w/2, h - 20, '#FFF', 14, 'center'
+      'Arrows/WASD + Shift to sprint, Space near NPC',
+      w / 2, h - 10,
+      '#FFF', 14, 'center'
     );
+
     this.rs.end();
   }
+
+  /** Handle keydown */
+  private handleKeyDown = (e: KeyboardEvent): void => {
+    const key = e.key.toLowerCase();
+
+    // Spacebar launches minigame if near region NPC
+    if (key === ' ' || key === 'spacebar') {
+      const region = this.mapSys.getRegionAtPosition(this.player.x, this.player.y);
+      if (region && this.regionGames[region.name]) {
+        const game = this.regionGames[region.name]();
+        this.loader.load(game);
+      }
+      return;
+    }
+
+    // Otherwise track movement/sprint keys
+    this.keys.add(key);
+  };
+
+  /** Handle keyup */
+  private handleKeyUp = (e: KeyboardEvent): void => {
+    this.keys.delete(e.key.toLowerCase());
+  };
 }

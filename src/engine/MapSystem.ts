@@ -1,27 +1,16 @@
 import { RenderSystem } from './RenderSystem';
 import { MapRegion, TileType } from '../types/GameTypes';
 
-interface RegionDef {
-  name: string;
-  xPct: number;
-  yPct: number;
-}
-
+interface RegionDef { name:string; xPct:number; yPct:number; }
 type DecoType =
   | 'microTree' | 'house' | 'city' | 'mountain'
   | 'bamboo' | 'palm' | 'lantern' | 'cherryBlossom'
-  | 'bridge' | 'gate' | 'platform' | 'pond'
-  | 'colorfulBanner' | 'floatingSkyLantern' | 'whimsicalFlower'; // New types
+  | 'bridge' | 'gate' | 'platform' | 'pond';
 
 interface Decoration {
   type: DecoType;
-  x: number;
-  y: number;
-  size?: number;
-  height?: number;
-  phase?: number;
-  color1?: string; // For multi-color items like banners
-  color2?: string;
+  x: number; y: number;
+  size?: number; height?: number;
 }
 
 export class MapSystem {
@@ -29,7 +18,7 @@ export class MapSystem {
   public rows = 500;
   public tileSize = 32;
 
-  // camera state
+  // camera
   public viewportX = 0;
   public viewportY = 0;
   private viewportWidth = 0;
@@ -38,14 +27,13 @@ export class MapSystem {
   private cameraFollowY = 0;
   private cameraSmoothing = 0.1;
 
-  // region definitions
   public regionDefs: RegionDef[] = [
-    { name: 'hardwareZone',   xPct: 0.15, yPct: 0.10 },
-    { name: 'softwareValley', xPct: 0.85, yPct: 0.10 },
-    { name: 'arcadeCove',     xPct: 0.15, yPct: 0.75 },
-    { name: 'consoleIsland',  xPct: 0.85, yPct: 0.75 },
-    { name: 'mobileBay',      xPct: 0.15, yPct: 0.40 },
-    { name: 'internetPoint',  xPct: 0.85, yPct: 0.40 },
+    { name:'hardwareZone',   xPct:0.15,yPct:0.10 },
+    { name:'softwareValley', xPct:0.85,yPct:0.10 },
+    { name:'arcadeCove',     xPct:0.15,yPct:0.75 },
+    { name:'consoleIsland',  xPct:0.85,yPct:0.75 },
+    { name:'mobileBay',      xPct:0.15,yPct:0.40 },
+    { name:'internetPoint',  xPct:0.85,yPct:0.40 },
   ];
 
   private pathTiles = new Set<string>();
@@ -56,199 +44,164 @@ export class MapSystem {
     this.scatterDecorations();
   }
 
-  /** Smooth camera follow */
   public update(): void {
-    const tx = this.cameraFollowX - this.viewportWidth  / 2;
-    const ty = this.cameraFollowY - this.viewportHeight / 2;
+    const tx = this.cameraFollowX - this.viewportWidth/2;
+    const ty = this.cameraFollowY - this.viewportHeight/2;
     this.viewportX += (tx - this.viewportX) * this.cameraSmoothing;
     this.viewportY += (ty - this.viewportY) * this.cameraSmoothing;
   }
 
-  /** Set camera target */
-  public setCameraTarget(x: number, y: number): void {
+  public setCameraTarget(x:number,y:number): void {
     this.cameraFollowX = x;
     this.cameraFollowY = y;
   }
 
-  /** Determine tile type by distance + path */
-  private getTileTypeAt(c: number, r: number): TileType {
-    const midC = this.cols/2, midR = this.rows/2;
-    const dx = c + 0.5 - midC, dy = r + 0.5 - midR;
-    const d  = Math.hypot(dx, dy), rad = this.cols * 0.45;
-    if (d > rad) return 'water';
-    if (this.pathTiles.has(`${c},${r}`)) return 'path';
-    if (d > rad - 2) return 'sand';
+  private getTileTypeAt(c:number,r:number):TileType {
+    const midC=this.cols/2, midR=this.rows/2;
+    const dx=c+0.5-midC, dy=r+0.5-midR;
+    const d=Math.hypot(dx,dy), rad=this.cols*0.45;
+    if(d>rad) return 'water';
+    if(this.pathTiles.has(`${c},${r}`)) return 'path';
+    if(d>rad-2) return 'sand';
     return 'grass';
   }
 
-  /** Bresenham line for paths */
-  private bresenham(x0: number, y0: number, x1: number, y1: number): [number,number][] {
-    const pts: [number,number][] = [];
-    let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy, x = x0, y = y0;
-    while (true) {
-      pts.push([x, y]);
-      if (x === x1 && y === y1) break;
-      const e2 = err * 2;
-      if (e2 >= dy) { err += dy; x += sx; }
-      if (e2 <= dx) { err += dx; y += sy; }
+  private bresenham(x0:number,y0:number,x1:number,y1:number):[number,number][] {
+    const pts:[number,number][]=[];
+    let dx=Math.abs(x1-x0), sx=x0<x1?1:-1;
+    let dy=-Math.abs(y1-y0), sy=y0<y1?1:-1;
+    let err=dx+dy, x=x0, y=y0;
+    while(true){
+      pts.push([x,y]);
+      if(x===x1&&y===y1)break;
+      const e2=err*2;
+      if(e2>=dy){err+=dy;x+=sx;}
+      if(e2<=dx){err+=dx;y+=sy;}
     }
     return pts;
   }
 
-  /** Build paths from center to each region */
-  private computePaths(): void {
-    const midC = Math.floor(this.cols/2),
-          midR = Math.floor(this.rows/2);
-    for (const r of this.regionDefs) {
-      const tx = Math.floor(r.xPct * this.cols),
-            ty = Math.floor(r.yPct * this.rows);
-      const px = Math.floor((midC + tx)/2 + (Math.random()*2-1)*10),
-            py = Math.floor((midR + ty)/2 + (Math.random()*2-1)*10);
-      const pivotX = Math.max(0, Math.min(this.cols-1, px)),
-            pivotY = Math.max(0, Math.min(this.rows-1, py));
-      for (const [c,rr] of this.bresenham(midC, midR, pivotX, pivotY))
+  private computePaths():void {
+    const midC=Math.floor(this.cols/2), midR=Math.floor(this.rows/2);
+    for(const r of this.regionDefs){
+      const tx=Math.floor(r.xPct*this.cols), ty=Math.floor(r.yPct*this.rows);
+      const px=Math.floor((midC+tx)/2 + (Math.random()*2-1)*10),
+            py=Math.floor((midR+ty)/2 + (Math.random()*2-1)*10);
+      const pivotX=Math.max(0,Math.min(this.cols-1,px)),
+            pivotY=Math.max(0,Math.min(this.rows-1,py));
+      for(const [c,rr] of this.bresenham(midC,midR,pivotX,pivotY))
         this.pathTiles.add(`${c},${rr}`);
-      for (const [c,rr] of this.bresenham(pivotX, pivotY, tx, ty))
+      for(const [c,rr] of this.bresenham(pivotX,pivotY,tx,ty))
         this.pathTiles.add(`${c},${rr}`);
     }
   }
 
-  /** Scatter all decorations */
-  private scatterDecorations(): void {
-    const W = this.cols * this.tileSize,
-          H = this.rows * this.tileSize,
-          midX = W/2, midY = H/2,
-          islandR = Math.min(W,H)*0.45,
-          cluster = 12;
+  private scatterDecorations():void {
+    const W=this.cols*this.tileSize, H=this.rows*this.tileSize;
+    const midX=W/2, midY=H/2, islandR=Math.min(W,H)*0.45, cluster=12;
 
-    // center platform & gate
-    this.decorations.push({ type:'platform', x:midX, y:midY, size:128 });
-    this.decorations.push({ type:'gate',     x:midX, y:midY - this.tileSize/2, size:64 });
+    this.decorations.push({type:'platform',x:midX,y:midY,size:128});
+    this.decorations.push({type:'gate',x:midX,y:midY-this.tileSize/2,size:64});
 
-    // region-specific clusters
-    for (const r of this.regionDefs) {
-      const cx = Math.floor(r.xPct * this.cols),
-            cy = Math.floor(r.yPct * this.rows);
-      const wx = cx*this.tileSize + this.tileSize/2,
-            wy = cy*this.tileSize + this.tileSize/2;
-
-      switch (r.name) {
+    for(const r of this.regionDefs){
+      const cx=Math.floor(r.xPct*this.cols), cy=Math.floor(r.yPct*this.rows);
+      const wx=cx*this.tileSize+this.tileSize/2, wy=cy*this.tileSize+this.tileSize/2;
+      switch(r.name){
         case 'hardwareZone': {
-          // houses on path
-          const roads = Array.from(this.pathTiles)
+          const roads=Array.from(this.pathTiles)
             .map(k=>k.split(',').map(Number) as [number,number])
             .filter(([c,rr])=>
-              Math.hypot(c-cx, rr-cy) <= cluster &&
-              this.getTileTypeAt(c,rr) === 'path'
+              Math.hypot(c-cx,rr-cy)<=cluster &&
+              this.getTileTypeAt(c,rr)==='path'
             );
-          for (let i=0; i<200 && roads.length; i++){
-            const [c,rr] = roads[Math.floor(Math.random()*roads.length)];
+          for(let i=0;i<200&&roads.length;i++){
+            const [c,rr]=roads[Math.floor(Math.random()*roads.length)];
             this.decorations.push({
               type:'house',
-              x: c*this.tileSize+this.tileSize/2,
-              y: rr*this.tileSize+this.tileSize/2,
-              size: 16 + Math.random()*24
+              x:c*this.tileSize+this.tileSize/2,
+              y:rr*this.tileSize+this.tileSize/2,
+              size:16+Math.random()*24
             });
           }
-          // city block
           this.decorations.push({
-            type:'city',
-            x: wx,
-            y: wy,
-            size: cluster*this.tileSize*0.8
+            type:'city',x:wx,y:wy,size:cluster*this.tileSize*0.8
           });
         } break;
-
         case 'softwareValley': {
-          // cherry blossoms & lanterns
-          for (let i=0;i<300;i++){
-            const a=Math.random()*2*Math.PI,
-                  d=Math.sqrt(Math.random())*cluster,
-                  tx=Math.floor(cx+Math.cos(a)*d),
+          for(let i=0;i<300;i++){
+            const a=Math.random()*2*Math.PI, d=Math.sqrt(Math.random())*cluster;
+            const tx=Math.floor(cx+Math.cos(a)*d),
                   ty=Math.floor(cy+Math.sin(a)*d);
-            if (this.getTileTypeAt(tx,ty)==='grass') {
-              if (Math.random()<0.3) {
+            if(this.getTileTypeAt(tx,ty)==='grass'){
+              if(Math.random()<0.3){
                 this.decorations.push({
                   type:'cherryBlossom',
-                  x: tx*this.tileSize+this.tileSize/2,
-                  y: ty*this.tileSize+this.tileSize/2,
-                  size: 16 + Math.random()*16
+                  x:tx*this.tileSize+this.tileSize/2,
+                  y:ty*this.tileSize+this.tileSize/2,
+                  size:16+Math.random()*16
                 });
               } else {
                 this.decorations.push({
                   type:'lantern',
-                  x: tx*this.tileSize+this.tileSize/2,
-                  y: ty*this.tileSize+this.tileSize/2 - this.tileSize/2,
-                  size: 8 + Math.random()*8
+                  x:tx*this.tileSize+this.tileSize/2,
+                  y:ty*this.tileSize+this.tileSize/2-this.tileSize/2,
+                  size:8+Math.random()*8
                 });
               }
             }
           }
         } break;
-
         case 'arcadeCove': {
-          // ponds scattered
-          for (let i=0;i<10;i++){
+          for(let i=0;i<10;i++){
             this.decorations.push({
               type:'pond',
-              x: wx + (Math.random()*2-1)*cluster*this.tileSize*0.5,
-              y: wy + (Math.random()*2-1)*cluster*this.tileSize*0.5,
-              size: 20 + Math.random()*40
+              x:wx + (Math.random()*2-1)*cluster*this.tileSize*0.5,
+              y:wy + (Math.random()*2-1)*cluster*this.tileSize*0.5,
+              size:20+Math.random()*40
             });
           }
         } break;
-
         case 'consoleIsland': {
-          // mountains
-          for (let i=0;i<200;i++){
-            const a=Math.random()*2*Math.PI,
-                  d=Math.sqrt(Math.random())*cluster,
-                  tx=Math.floor(cx+Math.cos(a)*d),
+          for(let i=0;i<200;i++){
+            const a=Math.random()*2*Math.PI, d=Math.sqrt(Math.random())*cluster;
+            const tx=Math.floor(cx+Math.cos(a)*d),
                   ty=Math.floor(cy+Math.sin(a)*d);
-            if (this.getTileTypeAt(tx,ty)==='grass') {
+            if(this.getTileTypeAt(tx,ty)==='grass'){
               this.decorations.push({
                 type:'mountain',
-                x: tx*this.tileSize+this.tileSize/2,
-                y: ty*this.tileSize+this.tileSize/2,
-                size: 20 + Math.random()*60
+                x:tx*this.tileSize+this.tileSize/2,
+                y:ty*this.tileSize+this.tileSize/2,
+                size:20+Math.random()*60
               });
             }
           }
         } break;
-
         case 'mobileBay': {
-          // palm trees on sand
-          for (let i=0;i<200;i++){
-            const a=Math.random()*2*Math.PI,
-                  d=Math.sqrt(Math.random())*cluster,
-                  tx=Math.floor(cx+Math.cos(a)*d),
+          for(let i=0;i<200;i++){
+            const a=Math.random()*2*Math.PI, d=Math.sqrt(Math.random())*cluster;
+            const tx=Math.floor(cx+Math.cos(a)*d),
                   ty=Math.floor(cy+Math.sin(a)*d);
-            if (this.getTileTypeAt(tx,ty)==='sand') {
+            if(this.getTileTypeAt(tx,ty)==='sand'){
               this.decorations.push({
                 type:'palm',
-                x: tx*this.tileSize+this.tileSize/2,
-                y: ty*this.tileSize+this.tileSize/2,
-                size: 16 + Math.random()*16
+                x:tx*this.tileSize+this.tileSize/2,
+                y:ty*this.tileSize+this.tileSize/2,
+                size:16+Math.random()*16
               });
             }
           }
         } break;
-
         case 'internetPoint': {
-          // bamboo groves
-          for (let i=0;i<200;i++){
-            const a=Math.random()*2*Math.PI,
-                  d=Math.sqrt(Math.random())*cluster,
-                  tx=Math.floor(cx+Math.cos(a)*d),
+          for(let i=0;i<200;i++){
+            const a=Math.random()*2*Math.PI, d=Math.sqrt(Math.random())*cluster;
+            const tx=Math.floor(cx+Math.cos(a)*d),
                   ty=Math.floor(cy+Math.sin(a)*d);
-            if (this.getTileTypeAt(tx,ty)==='grass') {
+            if(this.getTileTypeAt(tx,ty)==='grass'){
               this.decorations.push({
                 type:'bamboo',
-                x: tx*this.tileSize+this.tileSize/2,
-                y: ty*this.tileSize+this.tileSize/2,
-                height: 20 + Math.random()*80
+                x:tx*this.tileSize+this.tileSize/2,
+                y:ty*this.tileSize+this.tileSize/2,
+                height:20+Math.random()*80
               });
             }
           }
@@ -256,164 +209,104 @@ export class MapSystem {
       }
     }
 
-    // bridges where path crosses water
-    for (const key of this.pathTiles) {
-      const [c,r] = key.split(',').map(Number);
-      if (this.getTileTypeAt(c,r)==='water') {
+    for(const key of this.pathTiles){
+      const [c,r]=key.split(',').map(Number);
+      if(this.getTileTypeAt(c,r)==='water'){
         this.decorations.push({
           type:'bridge',
-          x: c*this.tileSize+this.tileSize/2,
-          y: r*this.tileSize+this.tileSize/2,
-          size: this.tileSize
+          x:c*this.tileSize+this.tileSize/2,
+          y:r*this.tileSize+this.tileSize/2,
+          size:this.tileSize
         });
       }
     }
 
-    // micro trees everywhere grass
-    for (let i=0;i<2000;i++){
-      let tx:number, ty:number;
+    for(let i=0;i<2000;i++){
+      let tx:number,ty:number;
       do {
-        const a=Math.random()*2*Math.PI,
-              d=Math.random()*islandR;
-        const wx2 = midX + Math.cos(a)*d,
-              wy2 = midY + Math.sin(a)*d;
-        tx = Math.floor(wx2 / this.tileSize);
-        ty = Math.floor(wy2 / this.tileSize);
-      } while (this.getTileTypeAt(tx,ty) !== 'grass');
+        const a=Math.random()*2*Math.PI, d=Math.random()*islandR;
+        const wx2=midX+Math.cos(a)*d, wy2=midY+Math.sin(a)*d;
+        tx=Math.floor(wx2/this.tileSize);
+        ty=Math.floor(wy2/this.tileSize);
+      } while(this.getTileTypeAt(tx,ty)!=='grass');
       this.decorations.push({
         type:'microTree',
-        x: tx*this.tileSize+this.tileSize/2,
-        y: ty*this.tileSize+this.tileSize/2,
-        size: 4 + Math.random()*6
+        x:tx*this.tileSize+this.tileSize/2,
+        y:ty*this.tileSize+this.tileSize/2,
+        size:4+Math.random()*6
       });
     }
-
-    // Add new decorations
-    // Colorful Banners near region centers
-    this.regionDefs.forEach(rDef => {
-      const wx = rDef.xPct * W;
-      const wy = rDef.yPct * H;
-      for (let i = 0; i < 3; i++) { // Add a few banners per region
-        this.decorations.push({
-          type: 'colorfulBanner',
-          x: wx + (Math.random() - 0.5) * 5 * this.tileSize,
-          y: wy + (Math.random() - 0.5) * 5 * this.tileSize - 30, // Slightly above ground
-          size: 40 + Math.random() * 20,
-          height: 60 + Math.random() * 30,
-          color1: `hsl(${Math.random() * 360}, 100%, 70%)`,
-          color2: `hsl(${Math.random() * 360}, 100%, 80%)`,
-          phase: Math.random() * 2 * Math.PI, // For waving animation
-        });
-      }
-    });
-
-    // Floating Sky Lanterns, especially over water or paths
-    for (let i = 0; i < 150; i++) {
-      const x = Math.random() * W;
-      const y = Math.random() * H;
-      const tileC = Math.floor(x / this.tileSize);
-      const tileR = Math.floor(y / this.tileSize);
-      if (this.getTileTypeAt(tileC, tileR) === 'water' || (this.pathTiles.has(`${tileC},${tileR}`) && Math.random() < 0.3)) {
-        this.decorations.push({
-          type: 'floatingSkyLantern',
-          x: x,
-          y: y - 50 - Math.random() * 100, // Float above
-          size: 15 + Math.random() * 10,
-          color1: `hsl(${Math.random() * 60 + 0}, 100%, 60%)`, // Oranges, Yellows, Reds
-          phase: Math.random() * 2 * Math.PI, // For bobbing/flicker
-        });
-      }
-    }
   }
 
-  /** Draw map and decorations */
   public render(
     rs: RenderSystem,
-    camX: number, camY: number,
-    viewW: number, viewH: number
+    camX:number, camY:number,
+    viewW:number, viewH:number
   ): void {
-    // update camera dims
     this.viewportWidth  = viewW;
     this.viewportHeight = viewH;
+    const sc = Math.max(0,Math.floor(camX/this.tileSize)-1),
+          ec = Math.min(this.cols,Math.ceil((camX+viewW)/this.tileSize)+1),
+          sr = Math.max(0,Math.floor(camY/this.tileSize)-1),
+          er = Math.min(this.rows,Math.ceil((camY+viewH)/this.tileSize)+1),
+          midC=this.cols/2, midR=this.rows/2, rad=this.cols*0.45;
 
-    const W = this.cols * this.tileSize,
-          H = this.rows * this.tileSize;
-
-    // clear area
-    rs.drawRect(0,0,viewW,viewH,'#000');
-
-    // draw tiles
-    const sc = Math.max(0, Math.floor(camX / this.tileSize) - 1),
-          ec = Math.min(this.cols, Math.ceil((camX+viewW)/this.tileSize) + 1),
-          sr = Math.max(0, Math.floor(camY / this.tileSize) - 1),
-          er = Math.min(this.rows, Math.ceil((camY+viewH)/this.tileSize) + 1),
-          midC = this.cols/2, midR = this.rows/2, rad = this.cols*0.45;
-
-    for (let r=sr; r<er; r++){
-      for (let c=sc; c<ec; c++){
-        const dx = c+0.5-midC, dy = r+0.5-midR, d=Math.hypot(dx,dy);
-        let type:TileType = 'water';
-        if (d <= rad) {
-          if (this.pathTiles.has(`${c},${r}`)) type='path';
-          else if (d > rad-2)                type='sand';
-          else                               type='grass';
+    for(let r=sr;r<er;r++){
+      for(let c=sc;c<ec;c++){
+        const dx=c+0.5-midC, dy=r+0.5-midR, d=Math.hypot(dx,dy);
+        let type:TileType='water';
+        if(d<=rad){
+          if(this.pathTiles.has(`${c},${r}`)) type='path';
+          else if(d>rad-2) type='sand';
+          else type='grass';
         }
-        rs.drawTile(c*this.tileSize - camX, r*this.tileSize - camY, this.tileSize, type);
+        rs.drawTile(c*this.tileSize-camX, r*this.tileSize-camY, this.tileSize, type);
       }
     }
 
-    // draw decorations
-    const M = 64;
-    const inView = (x:number,y:number)=>
-      x - camX >= -M && x - camX <= viewW+M &&
-      y - camY >= -M && y - camY <= viewH+M;
+    const M=64, inView=(x:number,y:number)=>
+      x-camX>=-M && x-camX<=viewW+M &&
+      y-camY>=-M && y-camY<=viewH+M;
 
-    for (const d of this.decorations) {
-      if (!inView(d.x,d.y)) continue;
-      const dx = d.x - camX, dy = d.y - camY;
-      switch (d.type) {
-        case 'microTree':      rs.drawTree(dx,dy,d.size!);          break;
-        case 'house':          rs.drawHouse(dx,dy,d.size!);         break;
-        case 'city':           rs.drawHouse(dx,dy,d.size!);         break;
-        case 'mountain':       rs.drawMountain(dx,dy,d.size!);      break;
-        case 'bamboo':         rs.drawBamboo(dx,dy,d.height!);      break;
-        case 'palm':           rs.drawPalm(dx,dy,d.size!);          break;
-        case 'lantern':        rs.drawLantern(dx,dy,d.size!);       break;
-        case 'cherryBlossom':  rs.drawCherryBlossom(dx,dy,d.size!); break;
-        case 'bridge':         rs.drawBridge(dx,dy,d.size!);        break;
-        case 'gate':           rs.drawGate(dx,dy,d.size!);          break;
-        case 'platform':       rs.drawPlatform(dx,dy,d.size!);      break;
-        case 'pond':           rs.drawPond(dx,dy,d.size!);          break;
-        case 'colorfulBanner': rs.drawColorfulBanner(dx, dy, d.size!, d.height!, d.color1!, d.color2!, d.phase!); break;
-        case 'floatingSkyLantern': rs.drawFloatingSkyLantern(dx, dy, d.size!, d.color1!, d.phase!); break;
-        // case 'whimsicalFlower': rs.drawWhimsicalFlower(dx, dy, d.size!, d.color1!, d.phase!); break; // Add if you implement this
+    for(const d of this.decorations){
+      if(!inView(d.x,d.y)) continue;
+      const dx=d.x-camX, dy=d.y-camY;
+      switch(d.type){
+        case 'microTree':     rs.drawTree(dx,dy,d.size!);           break;
+        case 'house':         rs.drawHouse(dx,dy,d.size!);          break;
+        case 'city':          rs.drawHouse(dx,dy,d.size!);          break;
+        case 'mountain':      rs.drawMountain(dx,dy,d.size!);       break;
+        case 'bamboo':        rs.drawBamboo(dx,dy,d.height!);       break;
+        case 'palm':          rs.drawPalm(dx,dy,d.size!);           break;
+        case 'lantern':       rs.drawLantern(dx,dy,d.size!);        break;
+        case 'cherryBlossom': rs.drawCherryBlossom(dx,dy,d.size!);  break;
+        case 'bridge':        rs.drawBridge(dx,dy,d.size!);         break;
+        case 'gate':          rs.drawGate(dx,dy,d.size!);           break;
+        case 'platform':      rs.drawPlatform(dx,dy,d.size!);       break;
+        case 'pond':          rs.drawPond(dx,dy,d.size!);           break;
       }
     }
 
-    // region labels
-    for (const r of this.regionDefs) {
-      const rx = r.xPct*W - camX, ry = r.yPct*H - camY;
-      if (inView(r.xPct*W, r.yPct*H)) {
-        rs.drawText(r.name, rx, ry + 20, '#FFF', 14, 'center');
-      }
+    for(const rd of this.regionDefs){
+      const wx=rd.xPct*this.cols*this.tileSize - camX,
+            wy=rd.yPct*this.rows*this.tileSize - camY;
+      if(inView(wx+camX, wy+camY)) rs.drawText(rd.name, wx, wy+20, '#FFF',14,'center');
     }
   }
 
-  /** Prevent walking on water */
-  public isWalkable(x: number, y: number): boolean {
-    const tx = Math.floor(x / this.tileSize),
-          ty = Math.floor(y / this.tileSize);
-    if (tx<0 || tx>=this.cols || ty<0 || ty>=this.rows) return false;
-    return this.getTileTypeAt(tx,ty) !== 'water';
+  public isWalkable(x:number,y:number):boolean {
+    const tx=Math.floor(x/this.tileSize),
+          ty=Math.floor(y/this.tileSize);
+    if(tx<0||tx>=this.cols||ty<0||ty>=this.rows) return false;
+    return this.getTileTypeAt(tx,ty)!=='water';
   }
 
-  /** Which region am I in? */
-  public getRegionAtPosition(x: number, y: number): MapRegion | null {
-    const c = Math.floor(x/this.tileSize), r = Math.floor(y/this.tileSize);
-    for (const rd of this.regionDefs) {
-      const tc = Math.floor(rd.xPct*this.cols),
-            tr = Math.floor(rd.yPct*this.rows);
-      if (Math.abs(c-tc)<=2 && Math.abs(r-tr)<=2) {
+  public getRegionAtPosition(x:number,y:number):MapRegion|null {
+    const c=Math.floor(x/this.tileSize), r=Math.floor(y/this.tileSize);
+    for(const rd of this.regionDefs){
+      const tc=Math.floor(rd.xPct*this.cols),
+            tr=Math.floor(rd.yPct*this.rows);
+      if(Math.abs(c-tc)<=2 && Math.abs(r-tr)<=2) {
         return { name: rd.name };
       }
     }
