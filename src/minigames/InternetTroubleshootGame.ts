@@ -24,7 +24,7 @@ export class InternetTroubleshootGame implements IMinigame {
   private allFixed = false;
   private parTime = 60_000; // 60 seconds par
 
-  init(canvas: HTMLCanvasElement, onComplete: () => void): void {
+  public init(canvas: HTMLCanvasElement, onComplete: () => void): void {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.onComplete = onComplete;
@@ -64,18 +64,18 @@ export class InternetTroubleshootGame implements IMinigame {
     });
   }
 
-  update(dt: number): void {
+  public update(dt: number): void {
     if (this.allFixed) return;
     this.elapsed = performance.now() - this.startTime;
 
     if (this.components.every(c => c.fixed)) {
       this.allFixed = true;
-      // Wait 2s for the celebration then back to island
+      // celebration then exit
       setTimeout(() => this.onComplete(), 2000);
     }
   }
 
-  render(ctx: CanvasRenderingContext2D): void {
+  public render(ctx: CanvasRenderingContext2D): void {
     // clear
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -102,26 +102,21 @@ export class InternetTroubleshootGame implements IMinigame {
           barY = 90;
     const doneCount = this.components.filter(c => c.fixed).length;
     const pct = doneCount / this.components.length;
-    // background
     ctx.fillStyle = '#555';
     ctx.fillRect(barX, barY, barW, barH);
-    // fill
     ctx.fillStyle = '#0F0';
     ctx.fillRect(barX, barY, barW * pct, barH);
-    // border
     ctx.strokeStyle = '#FFF';
     ctx.strokeRect(barX, barY, barW, barH);
 
-    // draw each component box
+    // components
     ctx.font = '16px monospace';
     ctx.textAlign = 'left';
     for (const comp of this.components) {
-      // box
       ctx.fillStyle = comp.fixed ? '#088' : '#444';
       ctx.fillRect(comp.x, comp.y, comp.width, comp.height);
       ctx.strokeStyle = comp.fixed ? '#0F0' : '#FFF';
       ctx.strokeRect(comp.x, comp.y, comp.width, comp.height);
-      // label
       ctx.fillStyle = '#FFF';
       ctx.fillText(
         comp.fixed ? comp.correct : comp.typo,
@@ -130,7 +125,7 @@ export class InternetTroubleshootGame implements IMinigame {
       );
     }
 
-    // completion message
+    // completion
     if (this.allFixed) {
       ctx.fillStyle = '#FF0';
       ctx.font = '32px monospace';
@@ -139,7 +134,8 @@ export class InternetTroubleshootGame implements IMinigame {
     }
   }
 
-  private handlePointer = (e: PointerEvent): void => {
+  // <-- now PUBLIC, not private -->
+  public handlePointer = (e: PointerEvent): void => {
     if (this.allFixed) return;
     const rect = this.canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -150,7 +146,6 @@ export class InternetTroubleshootGame implements IMinigame {
           mx >= comp.x && mx <= comp.x + comp.width &&
           my >= comp.y && my <= comp.y + comp.height
       ) {
-        // prompt fix
         const ans = prompt(`Fix the typo in "${comp.typo}"`, comp.correct);
         if (ans !== null && ans.trim().toLowerCase() === comp.correct.toLowerCase()) {
           comp.fixed = true;
@@ -162,7 +157,7 @@ export class InternetTroubleshootGame implements IMinigame {
     }
   };
 
-  destroy(): void {
+  public destroy(): void {
     this.canvas.removeEventListener('pointerdown', this.handlePointer);
   }
 }

@@ -23,7 +23,7 @@ export class RenderSystem {
       case 'grass':    color = '#38B000'; break;
       case 'sand':     color = '#FFD166'; break;
       case 'path':     color = '#A57939'; break;
-      case 'building': color = '#EF476F'; break;
+      case 'building': color = '#EF476F'; break
       case 'obstacle': color = '#073B4C'; break;
     }
     this.drawRect(x, y, size, size, color);
