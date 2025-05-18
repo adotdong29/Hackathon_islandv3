@@ -18,11 +18,22 @@ export class MinigameLoader {
 
   public load(game: IMinigame) {
     this.current?.destroy();
-    this.current = game;
-    game.init(this.canvas, () => {
-      // completed: you can show “Back to island” UI here
+    const gameToLoad = game; // Store a reference to the game being loaded
+    this.current = gameToLoad;
+
+    // The onComplete callback is for the gameToLoad instance
+    gameToLoad.init(this.canvas, () => {
       console.log('🎉 Minigame complete!');
+      // Ensure we are dealing with the game that was intended to be completed
+      if (this.current === gameToLoad) {
+        gameToLoad.destroy(); // Explicitly destroy the completed minigame to clean up its resources
+        this.current = undefined; // Signal to the GameEngine that no minigame is active
+      }
     });
+  }
+
+  public isGameActive(): boolean {
+    return !!this.current;
   }
 
   private loop(timestamp: number) {
