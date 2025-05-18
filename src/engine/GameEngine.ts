@@ -6,7 +6,7 @@ import { IMinigame }           from '../minigames/IMinigame';
 import { MinigameLoader }      from '../minigames/MinigameLoader';
 import { HardwareAssemblyGame } from '../minigames/HardwareAssemblyGame';
 import { SoftwareMazeGame }    from '../minigames/SoftwareMazeGame';
-// import { ArcadeHistoryGame }   from '../minigames/ArcadeHistoryGame';
+import { ArcadeHistoryGame }   from '../minigames/ArcadeHistory';
 import { TVAssemblyGame }      from '../minigames/TVAssemblyGame';
 import { MobileT9Game }        from '../minigames/MobileT9Game';
 import { InternetTroubleshootGame } from '../minigames/InternetTroubleshootGame';
@@ -41,7 +41,7 @@ export class GameEngine {
   private regionGames: Record<string, () => IMinigame> = {
     hardwareZone:   () => new HardwareAssemblyGame(),
     softwareValley: () => new SoftwareMazeGame(),
-    // arcadeCove:     () => new ArcadeHistoryGame(),
+    arcadeCove:     () => new ArcadeHistoryGame(),
     consoleIsland:  () => new TVAssemblyGame(),
     mobileBay:      () => new MobileT9Game(),
     internetPoint:  () => new InternetTroubleshootGame(),

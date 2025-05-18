@@ -3,161 +3,196 @@
 import { IMinigame } from './IMinigame';
 
 interface Component {
-  name: string;
-  typo: string;
-  correct: string;
+  id: string;
+  label: string;
   x: number;
   y: number;
-  width: number;
-  height: number;
+  w: number;
+  h: number;
+  typo: string;
+  correct: string;
+  hint: string;
   fixed: boolean;
 }
+
+type Phase = 'inspect' | 'fixing' | 'complete';
 
 export class InternetTroubleshootGame implements IMinigame {
   private canvas!: HTMLCanvasElement;
   private ctx!: CanvasRenderingContext2D;
   private onComplete!: () => void;
 
-  private components: Component[] = [];
+  private comps: Component[] = [];
+  private phase: Phase = 'inspect';
   private startTime = 0;
-  private elapsed = 0;
-  private allFixed = false;
-  private parTime = 60_000; // 60 seconds par
+  private endTime = 0;
+
+  constructor() {}
 
   public init(canvas: HTMLCanvasElement, onComplete: () => void): void {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.onComplete = onComplete;
-    this.canvas.addEventListener('pointerdown', this.handlePointer);
-
+    this.setupComponents();
     this.startTime = performance.now();
-    this.elapsed = 0;
-    this.allFixed = false;
+    canvas.addEventListener('click', this.onClick);
+  }
 
-    // Layout a 3×2 grid of components
-    const w = canvas.width, h = canvas.height;
-    const cols = 3, rows = 2;
-    const boxW = w / (cols + 1), boxH = h / (rows + 1);
-    const names: Array<[string, string]> = [
-      ['Router',        'Ruter'],
-      ['Switch',        'Swich'],
-      ['Cable',         'Cabel'],
-      ['DNS Server',    'DMS Server'],
-      ['Data Center',   'Data Cneter'],
-      ['Protocol',      'Protocl'],
+  public update(dt: number): void {
+    // no continuous animation
+  }
+
+  public render(): void {
+    const ctx = this.ctx;
+    ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    if (this.phase === 'inspect') {
+      this.renderInspect(ctx);
+    } else if (this.phase === 'complete') {
+      this.renderComplete(ctx);
+    }
+  }
+
+  public destroy(): void {
+    this.canvas.removeEventListener('click', this.onClick);
+  }
+
+  private setupComponents(): void {
+    const compSize = 100; // Size of each component box
+    const spacing = 40;   // Spacing between components
+    const topMargin = 120; // Margin from the top for the first row of components
+    const sideMargin = 50;  // Margin from the sides of the canvas
+
+    // Layout in two rows
+    const labels = [
+      {id:'router',label:'Router',typo:'routre',correct:'router',hint:'Starts with r and ends with r'},
+      {id:'switch',label:'Switch',typo:'swich',correct:'switch',hint:"Has two t's? Actually one t"},
+      {id:'cable',label:'Cable',typo:'cabel',correct:'cable',hint:'Ends with le'},
+      {id:'dns',label:'DNS Server',typo:'DN Server',correct:'DNS Server',hint:'Three letters acronym DNS'},
+      {id:'cloud',label:'Data Center',typo:'Data Cneter',correct:'Data Center',hint:'Center spelled C-e-n-t-e-r'},
+      {id:'tcp',label:'TCP Protocol',typo:'TC Protocol',correct:'TCP Protocol',hint:'Three letters TCP'}
     ];
 
-    this.components = names.map(([correct, typo], i) => {
-      const col = i % cols, row = Math.floor(i / cols);
-      const cx = (col + 1) * boxW;
-      const cy = (row + 1) * boxH;
+    // Calculate number of columns based on canvas width
+    const availableWidth = this.canvas.width - 2 * sideMargin;
+    const itemsPerRow = Math.max(1, Math.floor(availableWidth / (compSize + spacing)));
+    const totalItemWidth = itemsPerRow * compSize + (itemsPerRow - 1) * spacing;
+    const startXOffset = (this.canvas.width - totalItemWidth) / 2;
+
+    this.comps = labels.map((d, i) => {
+      const col = i % itemsPerRow;
+      const row = Math.floor(i / itemsPerRow);
       return {
-        name: correct,
-        typo,
-        correct,
-        x: cx - boxW / 3,
-        y: cy - boxH / 4,
-        width: (boxW * 2) / 3,
-        height: boxH / 2,
-        fixed: false,
+        id: d.id,
+        label: d.label,
+        typo: d.typo,
+        correct: d.correct,
+        hint: d.hint,
+        w: compSize,
+        h: compSize,
+        x: startXOffset + col * (compSize + spacing),
+        y: topMargin + row * (compSize + spacing + 20), // +20 for more vertical gap
+        fixed: false
       };
     });
   }
 
-  public update(dt: number): void {
-    if (this.allFixed) return;
-    this.elapsed = performance.now() - this.startTime;
-
-    if (this.components.every(c => c.fixed)) {
-      this.allFixed = true;
-      // celebration then exit
-      setTimeout(() => this.onComplete(), 2000);
-    }
+  private renderInspect(ctx: CanvasRenderingContext2D): void {
+    // Title centered
+    ctx.fillStyle = '#222'; ctx.fillRect(0, 0, this.canvas.width, 60);
+    ctx.fillStyle = '#fff'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Internet Down - Click or Tap Components to Inspect', this.canvas.width / 2, 40);
+    // Progress bar background centered width
+    const progressBarY = 70;
+    const progressBarHeight = 15;
+    const pbWidth = this.canvas.width * 0.8; // Progress bar width relative to canvas
+    const pbX = (this.canvas.width - pbWidth) / 2; // Center the progress bar
+    ctx.fillStyle = '#555'; ctx.fillRect(pbX, progressBarY, pbWidth, progressBarHeight);
+    // Progress
+    const fixedCount = this.comps.filter(c => c.fixed).length;
+    const pct = fixedCount / this.comps.length;
+    ctx.fillStyle = '#0f0'; ctx.fillRect(pbX, progressBarY, pbWidth * pct, progressBarHeight);
+    // Draw components
+    this.comps.forEach(c => {
+      ctx.save();
+      ctx.globalAlpha = c.fixed ? 0.5 : 1;
+      ctx.fillStyle = '#444'; ctx.fillRect(c.x, c.y, c.w, c.h);
+      ctx.strokeStyle = '#888'; ctx.lineWidth = 2; ctx.strokeRect(c.x, c.y, c.w, c.h);
+      ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(c.label, c.x + c.w / 2, c.y + c.h / 2);
+      ctx.restore();
+    });
   }
 
-  public render(ctx: CanvasRenderingContext2D): void {
-    // clear
-    ctx.fillStyle = '#222';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  private renderComplete(ctx: CanvasRenderingContext2D): void {
+    // Celebration
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillStyle = '#0f0'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Internet Restored!', this.canvas.width / 2, 100);
 
-    // title
-    ctx.fillStyle = '#0F0';
-    ctx.font = '24px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('Internet Troubleshooter', this.canvas.width / 2, 40);
+    const secs = ((this.endTime - this.startTime) / 1000).toFixed(2);
+    ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif';
+    ctx.fillText(`Time: ${secs} seconds`, this.canvas.width / 2, 150);
 
-    // timer & par
-    ctx.fillStyle = '#FFF';
-    ctx.font = '18px monospace';
-    ctx.fillText(
-      `Time: ${(this.elapsed / 1000).toFixed(1)}s   Par: ${(this.parTime / 1000).toFixed(0)}s`,
-      this.canvas.width / 2,
-      70
-    );
+    // History overview
+    const history = 'ARPANET laid the groundwork in the 1960s, evolving into the modern Internet with TCP/IP standardization in 1983. The World Wide Web, invented in 1989, democratized access, leading to the global interconnected network we use today.';
+    ctx.font = '16px sans-serif';
+    this.wrapText(history, this.canvas.width - 120).forEach((line, i) => {
+      ctx.fillText(line, this.canvas.width / 2, 200 + i * 24);
+    });
 
-    // progress bar
-    const barW = this.canvas.width * 0.6,
-          barH = 20,
-          barX = (this.canvas.width - barW) / 2,
-          barY = 90;
-    const doneCount = this.components.filter(c => c.fixed).length;
-    const pct = doneCount / this.components.length;
-    ctx.fillStyle = '#555';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = '#0F0';
-    ctx.fillRect(barX, barY, barW * pct, barH);
-    ctx.strokeStyle = '#FFF';
-    ctx.strokeRect(barX, barY, barW, barH);
-
-    // components
-    ctx.font = '16px monospace';
-    ctx.textAlign = 'left';
-    for (const comp of this.components) {
-      ctx.fillStyle = comp.fixed ? '#088' : '#444';
-      ctx.fillRect(comp.x, comp.y, comp.width, comp.height);
-      ctx.strokeStyle = comp.fixed ? '#0F0' : '#FFF';
-      ctx.strokeRect(comp.x, comp.y, comp.width, comp.height);
-      ctx.fillStyle = '#FFF';
-      ctx.fillText(
-        comp.fixed ? comp.correct : comp.typo,
-        comp.x + 10,
-        comp.y + comp.height / 2 + 6
-      );
-    }
-
-    // completion
-    if (this.allFixed) {
-      ctx.fillStyle = '#FF0';
-      ctx.font = '32px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('✓ Internet Restored!', this.canvas.width / 2, this.canvas.height / 2);
-    }
+    // Return button
+    const bw=200, bh=50;
+    const bx=(this.canvas.width-bw)/2, by=this.canvas.height-150;
+    ctx.fillStyle='#388E3C'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle='#fff'; ctx.fillText('Return to Island', this.canvas.width/2, by+32);
   }
 
-  // <-- now PUBLIC, not private -->
-  public handlePointer = (e: PointerEvent): void => {
-    if (this.allFixed) return;
+  private onClick = (e: MouseEvent): void => {
     const rect = this.canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
-    for (const comp of this.components) {
-      if (!comp.fixed &&
-          mx >= comp.x && mx <= comp.x + comp.width &&
-          my >= comp.y && my <= comp.y + comp.height
-      ) {
-        const ans = prompt(`Fix the typo in "${comp.typo}"`, comp.correct);
-        if (ans !== null && ans.trim().toLowerCase() === comp.correct.toLowerCase()) {
-          comp.fixed = true;
-        } else {
-          alert('Incorrect—check your spelling!');
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (this.phase === 'inspect') {
+      for (const c of this.comps) {
+        if (!c.fixed && x>=c.x && x<=c.x+c.w && y>=c.y && y<=c.y+c.h) {
+          // prompt fix
+          const ans = window.prompt(`Fix typo for ${c.label}: "${c.typo}"\nHint: ${c.hint}`);
+          if (ans?.trim() === c.correct) {
+            c.fixed = true;
+            // Check if all components are fixed after a successful fix
+            if (this.comps.every(comp => comp.fixed)) {
+              this.phase = 'complete';
+              this.endTime = performance.now();
+            }
+          } else {
+            alert(`Incorrect! Should be: ${c.correct}`);
+          }
+          return; // Process one click at a time
         }
-        break;
+      }
+    } else if (this.phase === 'complete') {
+      // Return to island
+      const bw=200, bh=50;
+      const bx=(this.canvas.width-bw)/2, by=this.canvas.height-100; // Adjusted 'by' to match renderComplete
+      if (x>=bx && x<=bx+bw && y>=by && y<=by+bh) {
+        this.onComplete();
       }
     }
-  };
+  }
 
-  public destroy(): void {
-    this.canvas.removeEventListener('pointerdown', this.handlePointer);
+  private wrapText(text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    words.forEach(word => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (this.ctx.measureText(testLine).width > maxWidth && currentLine !== '') {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    return lines;
   }
 }
