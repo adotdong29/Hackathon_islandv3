@@ -142,8 +142,8 @@ export class TVAssemblyGame implements IMinigame {
     ctx.strokeStyle = '#555'; ctx.lineWidth = 4; ctx.strokeRect(fx, fy, fw, fh);
 
     // Title
-    ctx.fillStyle = '#fff'; ctx.font = '26px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('Assemble the TV Parts', 20, 40);
+    ctx.fillStyle = '#fff'; ctx.font = '26px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Assemble the TV Parts', this.canvas.width / 2, 40);
 
     // Draw slots and highlight if dragging nearby
     this.parts.forEach(p => {
@@ -185,7 +185,7 @@ export class TVAssemblyGame implements IMinigame {
     ctx.fillStyle = '#111'; ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
     ctx.fillStyle = '#fff'; ctx.font = '28px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('1980s Television Tech', this.canvas.width/2, 60);
-    const txt = 'Vintage TVs used CRTs, electron guns, deflection coils, tuners, and circuit boards to deliver iconic broadcasts. These components powered the golden age of cable and brought shows into every home.';
+    const txt = 'Televisions of the 1980s were dominated by Cathode Ray Tube (CRT) technology. Inside these bulky sets, an electron gun would fire beams of electrons at a phosphor-coated screen. Deflection coils, using magnetic fields, precisely steered these beams to scan across the screen, illuminating pixels to form an image. Analog tuners selected VHF/UHF broadcast channels, while complex circuit boards processed video and audio signals. This era saw the rise of cable television, VCRs becoming household staples, and the introduction of stereo sound and remote controls, significantly enhancing the home entertainment experience. While CRTs were heavy and power-hungry, they offered excellent contrast and motion clarity, defining the visual aesthetic of the decade.';
     ctx.font = '18px sans-serif';
     this.wrapText(txt, this.canvas.width - 120).forEach((line, i) => {
       ctx.fillText(line, this.canvas.width/2, 100 + i*30);

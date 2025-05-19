@@ -84,7 +84,7 @@ export class MobileT9Game implements IMinigame {
     ctx.strokeStyle = '#0F0'; ctx.lineWidth = 2;
     ctx.strokeRect(5, 5, this.canvas.width - 10, this.displayH - 10);
 
-    ctx.fillStyle = '#0F0'; ctx.font = '24px monospace'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#0F0'; ctx.font = '24px monospace';
     if (this.phase === 'demo') {
       const msgs = [
         'Welcome to T9 Demo!',
@@ -92,8 +92,10 @@ export class MobileT9Game implements IMinigame {
         '0 = space, * = backspace',
         'Press screen to start'
       ];
-      ctx.fillText(msgs[this.demoStep], 10, 50);
+      ctx.textAlign = 'center';
+      ctx.fillText(msgs[this.demoStep], this.canvas.width / 2, 50);
     } else {
+      ctx.textAlign = 'left';
       ctx.fillText(this.currentText, 10, 50);
       ctx.font = '16px sans-serif';
       if (this.phase === 'playing') {
@@ -108,7 +110,7 @@ export class MobileT9Game implements IMinigame {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
       ctx.fillStyle = '#FFF'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
-      const txt = '1980s phones used multi-tap input to type messages.';
+      const txt = 'Early mobile phones of the 1980s, like the Motorola DynaTAC, were bulky and primarily for voice calls. Text messaging as we know it (SMS) didn\'t emerge until the early 1990s. However, the numeric keypads on these devices laid the groundwork for text input methods. Multi-tap, where users pressed a number key multiple times to cycle through letters (e.g., \'2\' for A, B, C), became a common input method on later feature phones before the advent of T9 predictive text (1990s) and full QWERTY keyboards on smartphones. The 1980s were about establishing mobile voice communication, paving the way for future data services.';
       this.wrapText(txt, this.canvas.width - 40).forEach((l, i) => {
         ctx.fillText(l, this.canvas.width / 2, 100 + i * 28);
       });
@@ -118,8 +120,11 @@ export class MobileT9Game implements IMinigame {
       const bx = (this.canvas.width - bw) / 2;
       const by = this.canvas.height - 80;
       ctx.fillStyle = '#388E3C'; ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = '#FFF'; ctx.font = '18px sans-serif'; // textAlign is already center
-      ctx.fillText('Return to Island', bx + bw / 2, by + 26);
+      ctx.fillStyle = '#FFF'; ctx.font = '18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Return to Island', bx + bw / 2, by + bh / 2);
+      ctx.textBaseline = 'alphabetic'; // Reset
       return;
     }
 

@@ -1,14 +1,5 @@
-// src/minigames/HardwareAssemblyGame.ts
-
 import { IMinigame } from './IMinigame';
 
-/**
- * Educational PC Assembly Game
- * Retro Google Doodle Championship Island style
- * Part 1: Interactive Demo
- * Part 2: Logic-based Assembly with auto-snap, labeled sockets, darker theme
- * Completion: In-depth IBM PC history overview with return to map
- */
 interface Component {
   id: string;
   name: string;
@@ -80,13 +71,50 @@ export class HardwareAssemblyGame implements IMinigame {
 
   private setupComponents(): void {
     const defs: Partial<Component>[] = [
-      { id: 'motherboard', name: 'Motherboard', color: '#455A64', description: 'Main PCB hosting CPU socket, DIMM slots, PCIe lanes, SATA ports.', dependencies: [] },
-      { id: 'cpu', name: 'CPU', color: '#546E7A', description: 'Intel 8088 CPU: executes instructions. Installs into CPU socket.', dependencies: ['motherboard'] },
-      { id: 'ram', name: 'RAM', color: '#37474F', description: '16–64KB RAM: volatile memory. Install into DIMM slots.', dependencies: ['motherboard'] },
-      { id: 'gpu', name: 'Graphics Card', color: '#616161', description: 'CGA graphics card. Connect via PCIe slot.', dependencies: ['motherboard','cpu','ram'] },
-      { id: 'storage', name: 'Storage', color: '#546E7A', description: 'Floppy/HDD: holds OS/data. Connect via SATA port.', dependencies: ['motherboard'] },
-      { id: 'psu', name: 'Power Supply', color: '#455A64', description: 'Supplies +5V/±12V power. Mount last and connect.', dependencies: ['motherboard','cpu','ram','gpu','storage'] }
+      { 
+        id: 'motherboard', 
+        name: 'Motherboard', 
+        color: '#455A64', 
+        description: 'The IBM PC motherboard, introduced in 1981, was a cornerstone of modern personal computing. Its open architecture, a departure from IBM\'s traditionally closed systems, allowed for unprecedented expandability. It featured the Intel 8088 CPU socket, five 8-bit ISA expansion slots for adding cards like graphics, sound, and modems, and a BIOS (Basic Input/Output System) ROM chip that provided low-level hardware control. This standardization was pivotal, enabling a vast ecosystem of third-party hardware and fostering the PC clone industry, which dramatically lowered costs and increased PC adoption.',
+        dependencies: [] 
+      },
+      { 
+        id: 'cpu', 
+        name: 'CPU', 
+        color: '#546E7A', 
+        description: 'The Intel 8088, running at a clock speed of 4.77 MHz, was the heart of the original IBM PC. While Intel also offered the 8086 (a true 16-bit processor), the 8088 was selected due to its 8-bit external data bus, which allowed for more cost-effective motherboard and peripheral design using existing 8-bit components. Internally, it was a 16-bit processor, capable of addressing up to 1MB of memory. This pragmatic choice by IBM balanced performance with the economic realities of the early 1980s, making the PC accessible to a wider market.',
+        dependencies: ['motherboard'] 
+      },
+      { 
+        id: 'ram', 
+        name: 'RAM', 
+        color: '#37474F', 
+        description: 'The first IBM PCs came with options for 16KB or 64KB of Random Access Memory (RAM), utilizing dynamic RAM (DRAM) chips. The motherboard itself could support up to 256KB. Through expansion cards, the system could be upgraded to a maximum of 640KB, a limit imposed by the PC\'s memory map. This "640KB barrier" became a famous constraint in the DOS era. The (often misattributed) quote, "640KB ought to be enough for anybody," highlights how rapidly software demands outgrew initial hardware capabilities.',
+        dependencies: ['motherboard'] 
+      },
+      { 
+        id: 'gpu', 
+        name: 'Graphics Card', 
+        color: '#616161', 
+        description: 'The Color Graphics Adapter (CGA), one of the first graphics cards for the IBM PC, brought color to personal computing. It had 16KB of video memory and supported several modes: a 320x200 resolution with 4 colors (from a palette of 16), a 640x200 monochrome mode, and various text modes (e.g., 80x25 characters). While its color capabilities were limited and often criticized for their garishness, CGA was a significant step up from monochrome displays and was crucial for the development of early PC games and graphical applications.',
+        dependencies: ['motherboard','cpu','ram'] 
+      },
+      { 
+        id: 'storage', 
+        name: 'Storage', 
+        color: '#546E7A', 
+        description: 'Initial IBM PCs relied on 5.25-inch floppy disk drives, each capable of storing 160KB (single-sided) or later 320KB/360KB (double-sided). Hard disk drives were a very expensive option, with the IBM PC XT in 1983 introducing a 10MB hard drive as a standard feature for that model. These early hard drives used MFM (Modified Frequency Modulation) controllers and were physically large, representing a massive leap in storage capacity and speed over floppy disks, essential for business applications and larger programs.',
+        dependencies: ['motherboard'] 
+      },
+      { 
+        id: 'psu', 
+        name: 'Power Supply', 
+        color: '#455A64', 
+        description: 'The original IBM PC power supply unit (PSU) provided 63.5 watts of power, delivering the necessary +5V, -5V, +12V, and -12V DC voltages to the motherboard and peripherals. Its physical form factor and connector types (though different from modern ATX) set an early standard. Notably, it included an integrated fan for cooling the system, a feature not universal in earlier personal computers, contributing to the PC\'s reliability and ability to house more powerful, heat-generating components.',
+        dependencies: ['motherboard','cpu','ram','gpu','storage'] 
+      }
     ];
+
     const mountX=180, mountY=180, mountW=440, mountH=390;
     this.components = defs.map((d,i)=>{
       let tx=0, ty=0;
@@ -154,12 +182,45 @@ export class HardwareAssemblyGame implements IMinigame {
       if(c.placed){if(c.id==='ram'){c.w=20;c.h=100;}else if(c.id==='storage'){c.w=20;c.h=20;}else if(c.id==='psu'){c.w=mountW;c.h=70;}ctx.strokeStyle='#8BC34A';ctx.lineWidth=2;ctx.beginPath();const sx=c.targetX+c.w/2,sy=c.targetY+c.h/2;let tx=sx,ty=sy;switch(c.id){case'motherboard':tx=mountX+mountW/2;ty=mountY+mountH/2;break;case'cpu':tx=360+40;ty=260+40;break;case'ram':tx=300+110;ty=360+50;break;case'gpu':tx=300+150;ty=480+10;break;case'storage':tx=620+10;ty=380+5;break;case'psu':tx=mountX+mountW/2;ty=560+35;break;}ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();}
     });
     ctx.fillStyle='#8BC34A';ctx.fillRect(20,20,this.progress*(this.canvas.width-40),10);
-    ctx.fillStyle='#D84315';ctx.fillRect(this.canvas.width-100,10,90,30);ctx.fillStyle='#ECEFF1';ctx.fillText('Reset',this.canvas.width-70,30);
+    ctx.fillStyle='#D84315';ctx.fillRect(this.canvas.width-100,10,90,30);
+    ctx.fillStyle='#ECEFF1'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Reset',this.canvas.width-100 + 90/2 ,10 + 30/2);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left'; // Reset
   }
 
-  private drawBoot(ctx:CanvasRenderingContext2D):void{ctx.fillStyle='#212121';ctx.fillRect(0,0,this.canvas.width,this.canvas.height);ctx.fillStyle='#8BC34A';ctx.font='36px monospace';const txt='BOOT INITIATED';const w=ctx.measureText(txt).width;ctx.fillText(txt,(this.canvas.width-w)/2,this.canvas.height/2);ctx.fillRect((this.canvas.width-300)/2,this.canvas.height/2+40,this.bootPct*300,30);}
+  private drawBoot(ctx:CanvasRenderingContext2D):void{
+    ctx.fillStyle='#212121';ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+    ctx.fillStyle='#8BC34A';ctx.font='36px monospace';
+    const txt='BOOT INITIATED - IBM PC COMPATIBLE';
+    const w=ctx.measureText(txt).width;
+    ctx.fillText(txt,(this.canvas.width-w)/2,this.canvas.height/2);
+    ctx.fillRect((this.canvas.width-300)/2,this.canvas.height/2+40,this.bootPct*300,30);
+  }
 
-  private drawHistory(ctx:CanvasRenderingContext2D):void{ctx.fillStyle='#ECEFF1';ctx.fillRect(50,50,this.canvas.width-100,this.canvas.height-100);ctx.fillStyle='#212121';ctx.font='18px sans-serif';this.wrapText('In 1981, IBM 5150 PC standardized open architecture: Intel 8088 CPU, 16–64KB RAM, CGA graphics, 5.25" floppy drive, expansion slots.',this.canvas.width-120).forEach((l,i)=>ctx.fillText(l,70,100+i*28));this.wrapText('Motherboard: PCB backbone; CPU socket holds processor; DIMM slots hold RAM; PCIe slot adds graphics; SATA port connects drives; PSU supplies power.',this.canvas.width-120).forEach((l,i)=>ctx.fillText(l,70,180+i*24));const bw=200,bh=40,bx=(this.canvas.width-bw)/2,by=this.canvas.height-120;ctx.fillStyle='#388E3C';ctx.fillRect(bx,by,bw,bh);ctx.fillStyle='#ECEFF1';ctx.font='20px sans-serif';ctx.fillText('Return to Island',bx+30,by+28);}
+  private drawHistory(ctx:CanvasRenderingContext2D):void{
+    ctx.fillStyle='#ECEFF1';ctx.fillRect(50,50,this.canvas.width-100,this.canvas.height-100);
+    ctx.fillStyle='#212121';ctx.font='24px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('The IBM PC Revolution - 1981',this.canvas.width/2,100);
+    
+    const history = [
+      "August 1981 marked a pivotal moment: the launch of the IBM Personal Computer (Model 5150). This machine didn't just enter the market; it fundamentally reshaped the future of computing. IBM, a giant in mainframe computing, made a strategic decision to use off-the-shelf components from external suppliers like Intel (CPU) and Microsoft (Operating System - PC DOS). Crucially, they adopted an open architecture, publishing technical specifications that allowed other companies to develop compatible hardware and software.",
+      "This openness was revolutionary. It quickly led to the emergence of 'PC clones' from companies like Compaq, Columbia Data Products, and Eagle Computer. These clones offered similar functionality, often at lower prices or with enhanced features, rapidly expanding the PC market. The combination of Intel's x86 architecture and Microsoft's DOS (Disk Operating System) formed the dominant 'Wintel' platform, a standard that would persist for decades, driving innovation and competition.",
+      "The IBM PC's initial success was fueled by its appeal to businesses, leveraging IBM's strong reputation for reliability and support. The base model, priced at $1,565 (equivalent to over $4,000 today), included 16KB of RAM, a monochrome display, and Cassette BASIC in ROM. Its expandability via ISA slots was key, allowing users to add more memory, graphics capabilities, and peripherals. This adaptability, coupled with a burgeoning third-party software ecosystem, made it a versatile tool for a wide range of applications, from word processing to financial analysis.",
+      "Within just two years, by 1983, the IBM PC ecosystem was thriving. Thousands of software applications were available, including VisiCalc (the first spreadsheet program, though Lotus 1-2-3 quickly became the killer app for the PC), WordStar (word processing), and dBase (database management). The PC's influence was profound, establishing de facto standards for keyboard layouts, display adapters (like CGA and MDA), expansion bus architecture, and even the physical form factor of desktop computers, shaping the trajectory of personal technology for generations."
+    ].join(' ');
+
+    ctx.font='16px sans-serif';
+    // textAlign is already 'center'
+    this.wrapText(history,this.canvas.width-140).forEach((l,i)=>ctx.fillText(l,this.canvas.width/2,140+i*24));
+
+    const bw=200,bh=40,bx=(this.canvas.width-bw)/2,by=this.canvas.height-120;
+    ctx.fillStyle='#388E3C';ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle='#ECEFF1';ctx.font='20px sans-serif'; // textAlign is 'center'
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Return to Island',bx + bw/2 ,by + bh/2);
+    ctx.textBaseline = 'alphabetic'; // Reset
+    ctx.textAlign = 'left'; // Reset for safety
+  }
 
   private onCanvasClick=(e:MouseEvent):void=>{const x=e.offsetX,y=e.offsetY;if(this.phase==='demo'){this.demoIndex++;if(this.demoIndex>=this.components.length)this.phase='assembly';}else if(this.phase==='assembly'){if(x>=this.canvas.width-100&&x<=this.canvas.width-10&&y>=10&&y<=40)this.setupComponents();}else if(this.phase==='history'){const bw=200,bh=40,bx=(this.canvas.width-bw)/2,by=this.canvas.height-120;if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh)this.onComplete();}};
 

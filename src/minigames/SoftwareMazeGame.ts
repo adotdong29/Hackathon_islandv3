@@ -246,13 +246,12 @@ export class SoftwareMazeGame implements IMinigame {
   private drawHistory(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.fillStyle = '#FFF';
-    ctx.font = '20px sans-serif';
+    ctx.fillStyle = '#FFF'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
     const txt =
-      'In the 1980s, debugging was manual: BASIC interpreters and assembly languages ran on terminals. ' +
-      'Programmers used punch cards, step through routines, and fixed bugs line by line. ' +
-      'This instilled deep care for efficient, error-free code.';
-    this.wrapText(txt, this.canvas.width - 40).forEach((l, i) => ctx.fillText(l, 20, 60 + i * 28));
+      'Debugging in the 1980s was a vastly different experience. Programmers often worked with BASIC interpreters or directly in assembly language, frequently on text-based terminals or even with line printers for output. Source-level debuggers were rudimentary or non-existent for many platforms. ' +
+      'Techniques involved inserting print statements (like PEEK and POKE in BASIC) to inspect memory, manually stepping through code using machine language monitors, or poring over hexadecimal dumps. For systems using punch cards or paper tape, the cycle of coding, compiling (if applicable), loading, and testing was laborious. ' +
+      'This environment fostered a meticulous approach to coding, as finding and fixing bugs was time-consuming and resource-intensive. The constraints of limited memory and processing power also demanded highly efficient, optimized, and carefully crafted code to minimize errors from the outset.';
+    this.wrapText(txt, this.canvas.width - 40).forEach((l, i) => ctx.fillText(l, this.canvas.width / 2, 60 + i * 28));
 
     // Return button
     const bw = 200,
@@ -261,9 +260,11 @@ export class SoftwareMazeGame implements IMinigame {
       by = this.canvas.height - 80;
     ctx.fillStyle = '#388E3C';
     ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = '#FFF';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Return to Island', bx + 20, by + 26);
+    ctx.fillStyle = '#FFF'; ctx.font = '18px sans-serif'; // textAlign is 'center'
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Return to Island', bx + bw / 2, by + bh / 2);
+    ctx.textBaseline = 'alphabetic'; // Reset
+    ctx.textAlign = 'left'; // Reset for safety
   }
 
   private onCanvasClick = (e: MouseEvent): void => {
